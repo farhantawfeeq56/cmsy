@@ -34,13 +34,12 @@ typography:
     lineHeight: 1.1
     letterSpacing: -0.48px
   body-md:
-    fontFamily: Nohemi
+    fontFamily: Plus Jakarta Sans
     fontSize: 1rem
     fontWeight: 400
     lineHeight: 1.3
-    letterSpacing: -0.16px
   label:
-    fontFamily: Nohemi
+    fontFamily: Plus Jakarta Sans
     fontSize: 0.875rem
     fontWeight: 500
     lineHeight: 1.2
@@ -141,15 +140,16 @@ Single ink anchors everything; blue and orange are signals, never surfaces.
 
 ## Typography
 
-One family everywhere: Nohemi variable (`app/fonts/Nohemi-VF.ttf`,
-`--font-nohemi`) with Arial fallback. Tight tracking on headlines,
-relaxed on body. Geist and Source Sans are retired — do not use them.
+Nohemi (variable, `--font-nohemi`) for display and headings; Plus Jakarta
+Sans (`--font-secondary`) for body copy and all UI chrome — nav, buttons,
+labels, badges. Tight tracking on Nohemi headlines, relaxed on Jakarta
+body. Geist and Source Sans are retired — do not use them.
 
-- **Display (3.5rem / 1.0 / -2.8px):** Marketing hero, one per viewport.
-- **H1 (2.75rem / 1.1):** Page and editor titles.
-- **H2 (1.75rem / 1.1):** Section and panel titles.
-- **Body-md (1rem / 1.3):** Paragraphs and agent instructions, max ~35rem measure.
-- **Label (0.875rem / medium):** Buttons, nav links, pills, code tags.
+- **Display (Nohemi, 3.5rem / 1.0 / -2.8px):** Hero statements, one per viewport.
+- **H1 (Nohemi, 2.75rem / 1.1):** Page and editor titles.
+- **H2 (Nohemi, 1.75rem / 1.1):** Section and panel titles.
+- **Body-md (Jakarta, 1rem / 1.3):** Paragraphs and agent instructions, max ~35rem measure.
+- **Label (Jakarta, 0.875rem / medium):** Buttons, nav links, pills, code tags.
 
 ## Layout
 
@@ -191,8 +191,8 @@ bubbles.
 
 ## Do's and Don'ts
 
-- Do set headlines in Nohemi with negative tracking; don't reintroduce
-  Geist or a system serif.
+- Do set headlines in Nohemi with negative tracking and body/UI in Plus
+  Jakarta Sans; don't reintroduce Geist or a system serif.
 - Do keep editor copy on Neutral/Surface with ink text; don't put body
   copy on blue, orange, or pastel fills.
 - Do use white text only on ink/charcoal; don't place white text on

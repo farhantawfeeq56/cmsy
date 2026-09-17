@@ -26,20 +26,8 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-nohemi), Arial, Helvetica, sans-serif;
+  font-family: var(--font-secondary), Arial, Helvetica, sans-serif;
 }
 
-/* vartest: secondary-font variants. Nohemi stays primary (display/headings
-   via .font-primary); the variant covers body copy AND ui chrome. */
-.sec-1 { --sec: var(--font-sec-1); }
-.sec-2 { --sec: var(--font-sec-2); }
-.sec-3 { --sec: var(--font-sec-3); }
-.sec-4 { --sec: var(--font-sec-4); }
-.sec-5 { --sec: var(--font-sec-5); }
-.sec-6 { --sec: var(--font-sec-6); }
-.sec-7 { --sec: var(--font-sec-7); }
-.sec-8 { --sec: var(--font-sec-8); }
-.sec-9 { --sec: var(--font-sec-9); }
-.sec-10 { --sec: var(--font-sec-10); }
-.vartest { font-family: var(--sec), Arial, sans-serif; }
+/* Nohemi stays primary for display/headings/logo */
 .font-primary { font-family: var(--font-nohemi), Arial, sans-serif; }

@@ -17,21 +17,19 @@ Changes made through CMSy are translated into a format that the connected agent 
 
 ## Architecture
 
-```mermaid
-graph TD
-    subgraph CMSy[CMSy App]
-        A[Component Editor]
-        B[No-Code Editor]
-    end
+### Layers
 
-    C[CMSy MCP]
-    D[AI / Agent]
-    E[Existing Codebase]
+| Layer | Description |
+| --- | --- |
+| **CMSy App** | The visual interface, containing the **Component Editor** and the **No-Code Editor** |
+| **CMSy MCP** | The bridge that translates CMSy changes into instructions agents can act on |
+| **AI / Agent** | A coding agent that reads those instructions and applies them |
+| **Existing Codebase** | Your application, updated by the agent through the shared layer |
 
-    A --> C
-    B --> C
-    C --> D
-    D --> E
+### Flow
+
+```text
+[CMSy App] --> [CMSy MCP] --> [AI / Agent] --> [Existing Codebase]
 ```
 
 ### Core idea

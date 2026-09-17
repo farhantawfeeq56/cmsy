@@ -4,7 +4,7 @@ description: CMSy — code-connected Components Editor and No-Code Editor on a w
 colors:
   primary: "#111111"
   secondary: "#272625"
-  tertiary: "#2D72F0"
+  tertiary: "#B7EFB2"
   neutral: "#F6F5F3"
   surface: "#FBFAF9"
   on-primary: "#FFFFFF"
@@ -104,7 +104,7 @@ components:
     backgroundColor: "{colors.border}"
     rounded: "{rounded.sm}"
     height: 1px
-  signal-blue:
+  signal-mint:
     backgroundColor: "{colors.tertiary}"
     rounded: "{rounded.pill}"
     size: 12px
@@ -125,11 +125,11 @@ one strong dark button, no gradients on core UI.
 
 ## Colors
 
-Single ink anchors everything; blue and orange are signals, never surfaces.
+Single ink anchors everything; mint drives action, orange signals alerts.
 
 - **Primary (#111111):** Near-black ink. Headlines, body text, primary buttons.
-- **Secondary (#272625):** Warm charcoal. Primary button hover only.
-- **Tertiary (#2D72F0):** Product blue. Agent-status dots, links, small accents — never large fills with text.
+- **Secondary (#272625):** Warm charcoal. Dark surfaces and emphasis text.
+- **Tertiary (#B7EFB2):** Mint action color. Buttons, signal dots, and interaction highlights — always with ink text.
 - **Neutral (#F6F5F3):** Warm paper editor background, softer than pure white.
 - **Surface (#FBFAF9):** Editor cards, instruction blocks, and nav fills on top of Neutral.
 - **On-primary (#FFFFFF):** Text on dark fills.
@@ -175,8 +175,8 @@ bubbles.
 
 ## Components
 
-- **Primary button:** ink fill, white label, 8px radius, `0.75rem 1rem`
-  padding, flex with 0.5rem gap. Hover goes charcoal with highlight shadow.
+- **Primary button:** mint fill, ink label, 8px radius, `0.75rem 1rem`
+  padding, flex with 0.5rem gap. Hover dims to 90% opacity.
 - **Secondary button:** paper fill at ~75% opacity with blur over dark,
   ink label, same radius.
 - **Card:** Surface fill, ink text, 12px radius, 24px padding, hairline
@@ -187,7 +187,7 @@ bubbles.
 - **Badges:** pastel fill (mint / yellow / violet), ink text, pill
   radius. Used for content state.
 - **Divider:** border-ink 1px line. **Signal dots:** 12px pills in
-  product blue or phoenix orange for agent/sync status, decorative only.
+  mint or phoenix orange for agent/sync status, decorative only.
 
 ## Do's and Don'ts
 
@@ -199,4 +199,4 @@ bubbles.
   product blue or phoenix orange (fails contrast).
 - Do use pastels with ink text for content-state badges; don't use them
   for buttons.
-- Do hover primary buttons to charcoal; don't add gradients to buttons.
+- Do hover primary buttons to 90% opacity; don't add gradients to buttons.

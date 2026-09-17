@@ -1,20 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-const accents = [
-  "Product",
-  "Phoenix",
-  "Deliver",
-  "Midnight",
-  "Leadgen",
-  "Intel",
-  "Engage",
-  "Mint",
-  "Canary",
-  "Forest",
-];
-
 const steps = [
   { n: "01", title: "CMSy App", text: "Edit content or describe a component in the visual interface." },
   { n: "02", title: "CMSy MCP", text: "Changes become structured instructions agents can understand." },
@@ -44,21 +27,8 @@ const features = [
 ];
 
 export default function Home() {
-  const [accent, setAccent] = useState(0);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key >= "1" && e.key <= "9") setAccent(Number(e.key) - 1);
-      else if (e.key === "0") setAccent(9);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
   return (
-    <div
-      className={`acc-${accent + 1} flex min-h-full flex-col bg-paper text-ink antialiased`}
-    >
+    <div className="flex min-h-full flex-col bg-paper text-ink antialiased">
       {/* Floating nav */}
       <header className="sticky top-4 z-10 mx-auto w-full max-w-5xl px-4">
         <nav className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card/90 py-3 pl-5 pr-3 backdrop-blur">
@@ -211,24 +181,6 @@ export default function Home() {
           <p>Code-connected content for AI-built codebases.</p>
         </div>
       </footer>
-
-      {/* vartest toolbar */}
-      <div className="fixed bottom-4 right-4 z-20 flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-1 rounded-2xl border border-line bg-ink p-1 text-white shadow-lg">
-        {accents.map((name, i) => (
-          <button
-            key={name}
-            onClick={() => setAccent(i)}
-            title={`${name} (${i === 9 ? 0 : i + 1})`}
-            className={`rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              accent === i
-                ? "bg-white text-ink"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            {i === 9 ? 0 : i + 1} {name}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

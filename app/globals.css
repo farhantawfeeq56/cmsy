@@ -3,8 +3,8 @@
 :root {
   --background: #f6f5f3;
   --foreground: #111111;
-  --accent: #2d72f0;
-  --accent-ink: #ffffff;
+  --accent: #b7efb2;
+  --accent-ink: #111111;
 }
 
 @theme inline {
@@ -31,18 +31,10 @@ body {
   font-family: var(--font-secondary), Arial, Helvetica, sans-serif;
 }
 
+::selection {
+  background: #b7efb2;
+  color: #111111;
+}
+
 /* Nohemi stays primary for display/headings/logo */
 .font-primary { font-family: var(--font-nohemi), Arial, sans-serif; }
-
-/* vartest: accent design-system variants. Each pairs a system accent with
-   its contrast-safe ink; buttons, dots, and hovers all follow. */
-.acc-1 { --accent: #2d72f0; --accent-ink: #ffffff; }
-.acc-2 { --accent: #e8400d; --accent-ink: #ffffff; }
-.acc-3 { --accent: #47d096; --accent-ink: #111111; }
-.acc-4 { --accent: #10054d; --accent-ink: #ffffff; }
-.acc-5 { --accent: #e16540; --accent-ink: #ffffff; }
-.acc-6 { --accent: #328efa; --accent-ink: #ffffff; }
-.acc-7 { --accent: #fbc768; --accent-ink: #111111; }
-.acc-8 { --accent: #b7efb2; --accent-ink: #111111; }
-.acc-9 { --accent: #ffef99; --accent-ink: #111111; }
-.acc-10 { --accent: #1c3c27; --accent-ink: #ffffff; }

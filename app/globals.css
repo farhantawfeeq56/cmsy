@@ -3,6 +3,7 @@
 :root {
   --background: #f6f5f3;
   --foreground: #111111;
+  --accent: #2d72f0;
 }
 
 @theme inline {
@@ -31,3 +32,10 @@ body {
 
 /* Nohemi stays primary for display/headings/logo */
 .font-primary { font-family: var(--font-nohemi), Arial, sans-serif; }
+
+/* vartest: accent color variants (signal dots + nav link hovers) */
+.acc-1 { --accent: #2d72f0; }
+.acc-2 { --accent: #e8400d; }
+.acc-3 { --accent: #47d096; }
+.acc-4 { --accent: #10054d; }
+.acc-5 { --accent: #ff91be; }

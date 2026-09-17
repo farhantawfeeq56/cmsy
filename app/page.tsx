@@ -1,3 +1,9 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+const accents = ["Blue", "Orange", "Green", "Indigo", "Pink"];
+
 const steps = [
   { n: "01", title: "CMSy App", text: "Edit content or describe a component in the visual interface." },
   { n: "02", title: "CMSy MCP", text: "Changes become structured instructions agents can understand." },
@@ -27,8 +33,21 @@ const features = [
 ];
 
 export default function Home() {
+  const [accent, setAccent] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const i = ["1", "2", "3", "4", "5"].indexOf(e.key);
+      if (i >= 0) setAccent(i);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
-    <div className="flex min-h-full flex-col bg-paper text-ink antialiased">
+    <div
+      className={`acc-${accent + 1} flex min-h-full flex-col bg-paper text-ink antialiased`}
+    >
       {/* Floating nav */}
       <header className="sticky top-4 z-10 mx-auto w-full max-w-5xl px-4">
         <nav className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card/90 py-3 pl-5 pr-3 backdrop-blur">
@@ -36,13 +55,13 @@ export default function Home() {
             CMSy
           </a>
           <div className="hidden items-center gap-6 text-sm font-medium text-smoke sm:flex">
-            <a href="#editors" className="transition-colors hover:text-ink">
+            <a href="#editors" className="transition-colors hover:text-[var(--accent)]">
               Editors
             </a>
-            <a href="#flow" className="transition-colors hover:text-ink">
+            <a href="#flow" className="transition-colors hover:text-[var(--accent)]">
               How it works
             </a>
-            <a href="#why" className="transition-colors hover:text-ink">
+            <a href="#why" className="transition-colors hover:text-[var(--accent)]">
               Why CMSy
             </a>
           </div>
@@ -59,7 +78,7 @@ export default function Home() {
         {/* Hero */}
         <section className="flex flex-col items-center py-24 text-center sm:py-32">
           <p className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-1.5 text-sm font-medium">
-            <span className="inline-block size-3 rounded-full bg-signal" />
+            <span className="inline-block size-3 rounded-full bg-[var(--accent)]" />
             AI-native CMS for codebases
           </p>
           <h1 className="font-primary mt-6 max-w-3xl text-5xl font-normal leading-[1.05] tracking-[-0.03em] sm:text-7xl">
@@ -84,7 +103,7 @@ export default function Home() {
             </a>
           </div>
           <p className="mt-8 flex items-center gap-2 text-sm text-smoke">
-            <span className="inline-block size-2 rounded-full bg-signal" />
+            <span className="inline-block size-2 rounded-full bg-[var(--accent)]" />
             Agent connected
             <span className="text-ink/20">·</span>
             <span className="inline-block size-2 rounded-full bg-ember" />
@@ -181,6 +200,24 @@ export default function Home() {
           <p>Code-connected content for AI-built codebases.</p>
         </div>
       </footer>
+
+      {/* vartest toolbar */}
+      <div className="fixed bottom-4 right-4 z-20 flex items-center gap-1 rounded-full border border-line bg-ink p-1 text-white shadow-lg">
+        {accents.map((name, i) => (
+          <button
+            key={name}
+            onClick={() => setAccent(i)}
+            title={`${name} (${i + 1})`}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              accent === i
+                ? "bg-white text-ink"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            {i + 1} {name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

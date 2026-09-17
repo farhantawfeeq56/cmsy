@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CMSy
 
-## Getting Started
+**CMSy** is a code-connected content and component management environment.
 
-First, run the development server:
+It sits between your existing codebase and a visual editing interface, allowing you to edit content and build UI components without manually jumping between code and a CMS.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## What is CMSy?
+
+CMSy connects to an existing codebase through the **CMSy MCP**.
+
+It has two primary environments:
+
+- **Components Editor** — create and modify components using AI / vibe coding.
+- **No-Code Editor** — visually edit structured content such as blog posts and other application content.
+
+Changes made through CMSy are translated into a format that the connected agent can understand and apply to the codebase.
+
+## Architecture
+
+```text
+┌──────────────────────┐
+│      CMSy App        │
+│                      │
+│  ┌────────────────┐  │
+│  │ Component      │  │
+│  │ Editor         │  │
+│  └────────────────┘  │
+│                      │
+│  ┌────────────────┐  │
+│  │ No-Code        │  │
+│  │ Editor         │  │
+│  └────────────────┘  │
+└──────────┬───────────┘
+           │
+           │ CMSy MCP
+           ▼
+┌──────────────────────┐
+│     AI / Agent       │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│   Existing Codebase  │
+└──────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Core idea
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+CMSy does not replace your existing codebase.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Instead, it provides an interface for humans and agents to work with the codebase through a shared layer.
 
-## Learn More
+The **CMSy MCP** acts as the bridge between CMSy and the development environment. This allows CMSy to understand and manipulate things that already exist in the application — rather than forcing developers to migrate everything into a traditional CMS.
 
-To learn more about Next.js, take a look at the following resources:
+## Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Component Editor
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Build and modify UI components using AI.
 
-## Deploy on Vercel
+Instead of manually writing every component from scratch, developers can describe what they want and iterate on the component directly inside CMSy.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### No-Code Editor
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Edit application content without touching the underlying code.
+
+Examples include:
+
+- Blog posts
+- Landing-page content
+- Text
+- Images
+- Structured content
+- Other editable application data
+
+### Agent-readable changes
+
+CMSy produces structured, copyable instructions that an AI coding agent can understand.
+
+This makes it possible to move from:
+
+```text
+Design / Edit → Structured instruction → Agent → Codebase
+```
+
+## Why CMSy?
+
+Traditional CMSs generally separate content from the application's codebase.
+
+AI coding agents can modify code, but they are not necessarily designed around non-technical content editing.
+
+CMSy explores the middle ground: **a CMS for codebases that are increasingly built and maintained by AI agents.**

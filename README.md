@@ -17,31 +17,21 @@ Changes made through CMSy are translated into a format that the connected agent 
 
 ## Architecture
 
-```text
-┌──────────────────────┐
-│      CMSy App        │
-│                      │
-│  ┌────────────────┐  │
-│  │ Component      │  │
-│  │ Editor         │  │
-│  └────────────────┘  │
-│                      │
-│  ┌────────────────┐  │
-│  │ No-Code        │  │
-│  │ Editor         │  │
-│  └────────────────┘  │
-└──────────┬───────────┘
-           │
-           │ CMSy MCP
-           ▼
-┌──────────────────────┐
-│     AI / Agent       │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│   Existing Codebase  │
-└──────────────────────┘
+```mermaid
+graph TD
+    subgraph CMSy[CMSy App]
+        A[Component Editor]
+        B[No-Code Editor]
+    end
+
+    C[CMSy MCP]
+    D[AI / Agent]
+    E[Existing Codebase]
+
+    A --> C
+    B --> C
+    C --> D
+    D --> E
 ```
 
 ### Core idea

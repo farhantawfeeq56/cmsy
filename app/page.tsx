@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 
-const accents = ["Blue", "Orange", "Green", "Indigo", "Pink"];
+const accents = [
+  "Product",
+  "Phoenix",
+  "Deliver",
+  "Midnight",
+  "Leadgen",
+  "Intel",
+  "Engage",
+  "Mint",
+  "Canary",
+  "Forest",
+];
 
 const steps = [
   { n: "01", title: "CMSy App", text: "Edit content or describe a component in the visual interface." },
@@ -37,8 +48,8 @@ export default function Home() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const i = ["1", "2", "3", "4", "5"].indexOf(e.key);
-      if (i >= 0) setAccent(i);
+      if (e.key >= "1" && e.key <= "9") setAccent(Number(e.key) - 1);
+      else if (e.key === "0") setAccent(9);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -67,7 +78,7 @@ export default function Home() {
           </div>
           <a
             href="#cta"
-            className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-charcoal"
+            className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
           >
             Get started
           </a>
@@ -91,7 +102,7 @@ export default function Home() {
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <a
               href="#cta"
-              className="rounded-lg bg-ink px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-charcoal"
+              className="rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Start building
             </a>
@@ -186,7 +197,7 @@ export default function Home() {
             </h2>
             <a
               href="#"
-              className="mt-8 rounded-lg bg-white px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-paper"
+              className="mt-8 rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Get started with CMSy
             </a>
@@ -202,19 +213,19 @@ export default function Home() {
       </footer>
 
       {/* vartest toolbar */}
-      <div className="fixed bottom-4 right-4 z-20 flex items-center gap-1 rounded-full border border-line bg-ink p-1 text-white shadow-lg">
+      <div className="fixed bottom-4 right-4 z-20 flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-1 rounded-2xl border border-line bg-ink p-1 text-white shadow-lg">
         {accents.map((name, i) => (
           <button
             key={name}
             onClick={() => setAccent(i)}
-            title={`${name} (${i + 1})`}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            title={`${name} (${i === 9 ? 0 : i + 1})`}
+            className={`rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
               accent === i
                 ? "bg-white text-ink"
                 : "text-white/60 hover:text-white"
             }`}
           >
-            {i + 1} {name}
+            {i === 9 ? 0 : i + 1} {name}
           </button>
         ))}
       </div>

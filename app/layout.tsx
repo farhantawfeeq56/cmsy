@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import {
-  DM_Sans,
-  IBM_Plex_Sans,
-  Inter,
-  Manrope,
-  Outfit,
+  Figtree,
+  Hanken_Grotesk,
+  Instrument_Sans,
+  Lexend,
+  Nunito_Sans,
   Plus_Jakarta_Sans,
-  Public_Sans,
-  Source_Sans_3,
-  Space_Grotesk,
-  Work_Sans,
+  Red_Hat_Text,
+  Schibsted_Grotesk,
+  Sora,
+  Urbanist,
 } from "next/font/google";
 import "./globals.css";
 
@@ -20,19 +20,21 @@ const nohemi = localFont({
   display: "swap",
 });
 
-const sec1 = Inter({ subsets: ["latin"], variable: "--font-sec-1" });
-const sec2 = Manrope({ subsets: ["latin"], variable: "--font-sec-2" });
-const sec3 = Space_Grotesk({ subsets: ["latin"], variable: "--font-sec-3" });
-const sec4 = IBM_Plex_Sans({
+const sec1 = Sora({ subsets: ["latin"], variable: "--font-sec-1" });
+const sec2 = Figtree({ subsets: ["latin"], variable: "--font-sec-2" });
+const sec3 = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-sec-3" });
+const sec4 = Urbanist({ subsets: ["latin"], variable: "--font-sec-4" });
+const sec5 = Lexend({ subsets: ["latin"], variable: "--font-sec-5" });
+const sec6 = Nunito_Sans({ subsets: ["latin"], variable: "--font-sec-6" });
+const sec7 = Red_Hat_Text({ subsets: ["latin"], variable: "--font-sec-7" });
+const sec8 = Instrument_Sans({
   subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-sec-4",
+  variable: "--font-sec-8",
 });
-const sec5 = Source_Sans_3({ subsets: ["latin"], variable: "--font-sec-5" });
-const sec6 = Public_Sans({ subsets: ["latin"], variable: "--font-sec-6" });
-const sec7 = Work_Sans({ subsets: ["latin"], variable: "--font-sec-7" });
-const sec8 = DM_Sans({ subsets: ["latin"], variable: "--font-sec-8" });
-const sec9 = Outfit({ subsets: ["latin"], variable: "--font-sec-9" });
+const sec9 = Schibsted_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-sec-9",
+});
 const sec10 = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-sec-10",

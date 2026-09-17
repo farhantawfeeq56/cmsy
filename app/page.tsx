@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 
 const variants = [
-  "Inter",
-  "Manrope",
-  "Grotesk",
-  "Plex",
-  "Source",
-  "Public",
-  "Work",
-  "DM",
-  "Outfit",
+  "Sora",
+  "Figtree",
+  "Hanken",
+  "Urbanist",
+  "Lexend",
+  "Nunito",
+  "RedHat",
+  "Instrument",
+  "Schibsted",
   "Jakarta",
 ];
 

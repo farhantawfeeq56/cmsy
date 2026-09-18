@@ -47,7 +47,7 @@ export default function Home() {
             </a>
           </div>
           <a
-            href="#cta"
+            href="/dashboard"
             className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
           >
             Get started
@@ -71,7 +71,7 @@ export default function Home() {
           </p>
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <a
-              href="#cta"
+              href="/dashboard"
               className="rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Start building
@@ -166,7 +166,7 @@ export default function Home() {
               Give your agents — and your team — one surface.
             </h2>
             <a
-              href="#"
+              href="/dashboard"
               className="mt-8 rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Get started with CMSy

@@ -38,3 +38,87 @@ body {
 
 /* Nohemi stays primary for display/headings/logo */
 .font-primary { font-family: var(--font-nohemi), Arial, sans-serif; }
+
+/* Dashboard primitives — see DESIGN.md (surface cards, ink text, mint action) */
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  transition: opacity 150ms ease;
+}
+
+.btn:hover { opacity: 0.9; }
+
+.btn-quiet {
+  background: transparent;
+  color: var(--color-smoke);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+}
+
+.btn-quiet:hover { background: #1111110d; color: var(--color-ink); opacity: 1; }
+
+.input {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: #ffffff;
+  color: var(--color-ink);
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-smoke);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 28px;
+  background: var(--color-mint);
+  color: var(--color-ink);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-quiet {
+  background: #1111110a;
+  color: var(--color-smoke);
+}
+
+.tab {
+  border-radius: 8px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-smoke);
+}
+
+.tab:hover { color: var(--color-ink); }
+
+.tab[data-active="true"] { background: #1111110d; color: var(--color-ink); }

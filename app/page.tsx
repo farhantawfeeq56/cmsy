@@ -28,27 +28,27 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
+    <div className="flex min-h-full flex-col bg-paper text-ink antialiased">
       {/* Floating nav */}
       <header className="sticky top-4 z-10 mx-auto w-full max-w-5xl px-4">
         <nav className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card/90 py-3 pl-5 pr-3 backdrop-blur">
-          <a href="#" className="text-lg font-semibold tracking-tight">
+          <a href="#" className="font-primary text-lg font-semibold tracking-tight">
             CMSy
           </a>
           <div className="hidden items-center gap-6 text-sm font-medium text-smoke sm:flex">
-            <a href="#editors" className="transition-colors hover:text-ink">
+            <a href="#editors" className="transition-colors hover:text-[var(--accent)]">
               Editors
             </a>
-            <a href="#flow" className="transition-colors hover:text-ink">
+            <a href="#flow" className="transition-colors hover:text-[var(--accent)]">
               How it works
             </a>
-            <a href="#why" className="transition-colors hover:text-ink">
+            <a href="#why" className="transition-colors hover:text-[var(--accent)]">
               Why CMSy
             </a>
           </div>
           <a
             href="#cta"
-            className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-charcoal"
+            className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
           >
             Get started
           </a>
@@ -59,10 +59,10 @@ export default function Home() {
         {/* Hero */}
         <section className="flex flex-col items-center py-24 text-center sm:py-32">
           <p className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-1.5 text-sm font-medium">
-            <span className="inline-block size-3 rounded-full bg-signal" />
+            <span className="inline-block size-3 rounded-full bg-[var(--accent)]" />
             AI-native CMS for codebases
           </p>
-          <h1 className="mt-6 max-w-3xl text-5xl font-normal leading-[1.05] tracking-[-0.03em] sm:text-7xl">
+          <h1 className="font-primary mt-6 max-w-3xl text-5xl font-normal leading-[1.05] tracking-[-0.03em] sm:text-7xl">
             Edit content. Build components. Ship.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-smoke">
@@ -72,7 +72,7 @@ export default function Home() {
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <a
               href="#cta"
-              className="rounded-lg bg-ink px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-charcoal"
+              className="rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Start building
             </a>
@@ -84,7 +84,7 @@ export default function Home() {
             </a>
           </div>
           <p className="mt-8 flex items-center gap-2 text-sm text-smoke">
-            <span className="inline-block size-2 rounded-full bg-signal" />
+            <span className="inline-block size-2 rounded-full bg-[var(--accent)]" />
             Agent connected
             <span className="text-ink/20">·</span>
             <span className="inline-block size-2 rounded-full bg-ember" />
@@ -94,7 +94,7 @@ export default function Home() {
 
         {/* Editors */}
         <section id="editors" className="scroll-mt-24 pb-20">
-          <h2 className="text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
+          <h2 className="font-primary text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
             Two editors, one codebase
           </h2>
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -108,7 +108,7 @@ export default function Home() {
                 >
                   {f.badge}
                 </span>
-                <h3 className="mt-4 text-xl font-medium tracking-tight">
+                <h3 className="font-primary mt-4 text-xl font-medium tracking-tight">
                   {f.title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-smoke">
@@ -124,7 +124,7 @@ export default function Home() {
           id="flow"
           className="scroll-mt-24 rounded-2xl bg-card px-6 py-14 sm:px-12"
         >
-          <h2 className="text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
+          <h2 className="font-primary text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
             Design → Instruction → Agent → Codebase
           </h2>
           <ol className="mt-10 grid gap-4 sm:grid-cols-4">
@@ -134,7 +134,7 @@ export default function Home() {
                 className="rounded-xl border border-line bg-paper p-5"
               >
                 <p className="text-xs font-medium text-smoke">{s.n}</p>
-                <h3 className="mt-1 font-medium tracking-tight">{s.title}</h3>
+                <h3 className="font-primary mt-1 font-medium tracking-tight">{s.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-smoke">
                   {s.text}
                 </p>
@@ -145,7 +145,7 @@ export default function Home() {
 
         {/* Why */}
         <section id="why" className="scroll-mt-24 py-20">
-          <h2 className="mx-auto max-w-xl text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
+          <h2 className="font-primary mx-auto max-w-xl text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
             Not a CMS bolted on. A layer built in.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-center leading-relaxed text-smoke">
@@ -162,12 +162,12 @@ export default function Home() {
             <p className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium">
               CMSy
             </p>
-            <h2 className="mt-5 max-w-xl text-3xl font-normal tracking-[-0.02em] sm:text-5xl">
+            <h2 className="font-primary mt-5 max-w-xl text-3xl font-normal tracking-[-0.02em] sm:text-5xl">
               Give your agents — and your team — one surface.
             </h2>
             <a
               href="#"
-              className="mt-8 rounded-lg bg-white px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-paper"
+              className="mt-8 rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Get started with CMSy
             </a>
@@ -177,7 +177,7 @@ export default function Home() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-smoke sm:flex-row">
-          <p className="font-medium text-ink">CMSy</p>
+          <p className="font-primary font-medium text-ink">CMSy</p>
           <p>Code-connected content for AI-built codebases.</p>
         </div>
       </footer>

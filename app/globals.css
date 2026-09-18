@@ -3,6 +3,8 @@
 :root {
   --background: #f6f5f3;
   --foreground: #111111;
+  --accent: #b7efb2;
+  --accent-ink: #111111;
 }
 
 @theme inline {
@@ -26,5 +28,13 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-nohemi), Arial, Helvetica, sans-serif;
+  font-family: var(--font-secondary), Arial, Helvetica, sans-serif;
 }
+
+::selection {
+  background: #b7efb2;
+  color: #111111;
+}
+
+/* Nohemi stays primary for display/headings/logo */
+.font-primary { font-family: var(--font-nohemi), Arial, sans-serif; }

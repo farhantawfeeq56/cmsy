@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { sql } from "@/db";
+import { db } from "@/db";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -48,18 +48,18 @@ export async function createSpace(formData: FormData) {
 
   const base = slugify(name);
   const row = await insertWithSlug(
-    (slug) => sql`insert into spaces (name, slug) values (${name}, ${slug})
+    (slug) => db()`insert into spaces (name, slug) values (${name}, ${slug})
       on conflict (slug) do nothing returning id`,
     base,
   );
   if (!row) return;
 
   // A space starts with its own design system, which it can later swap out.
-  const [designSystem] = (await sql`
+  const [designSystem] = (await db()`
     insert into design_systems (space_id, name)
     values (${row.id}, ${`${name} design system`})
     returning id`) as { id: string }[];
-  await sql`update spaces set design_system_id = ${designSystem.id} where id = ${row.id}`;
+  await db()`update spaces set design_system_id = ${designSystem.id} where id = ${row.id}`;
 
   refresh();
   redirect(`/dashboard/${base}`);
@@ -71,7 +71,7 @@ export async function createPage(formData: FormData) {
   if (!spaceId || !title) return;
 
   await insertWithSlug(
-    (slug) => sql`insert into pages (space_id, title, slug) values (${spaceId}, ${title}, ${slug})
+    (slug) => db()`insert into pages (space_id, title, slug) values (${spaceId}, ${title}, ${slug})
       on conflict (space_id, slug) do nothing returning id`,
     slugify(title),
   );
@@ -83,7 +83,7 @@ export async function deletePage(formData: FormData) {
   const spaceId = uuid(formData.get("spaceId"));
   if (!id || !spaceId) return;
 
-  await sql`delete from pages where id = ${id} and space_id = ${spaceId}`;
+  await db()`delete from pages where id = ${id} and space_id = ${spaceId}`;
   refresh();
 }
 
@@ -93,7 +93,7 @@ export async function createComponent(formData: FormData) {
   if (!spaceId || !name) return;
 
   const description = text(formData.get("description"), 300);
-  await sql`insert into components (space_id, name, description)
+  await db()`insert into components (space_id, name, description)
     values (${spaceId}, ${name}, ${description})
     on conflict (space_id, name) do nothing`;
   refresh();
@@ -105,7 +105,7 @@ export async function importComponent(formData: FormData) {
   const componentId = uuid(formData.get("componentId"));
   if (!spaceId || !componentId) return;
 
-  await sql`insert into components (space_id, name, description, origin_component_id)
+  await db()`insert into components (space_id, name, description, origin_component_id)
     select ${spaceId}, name, description, id
     from components
     where id = ${componentId} and space_id <> ${spaceId}
@@ -118,7 +118,7 @@ export async function deleteComponent(formData: FormData) {
   const spaceId = uuid(formData.get("spaceId"));
   if (!id || !spaceId) return;
 
-  await sql`delete from components where id = ${id} and space_id = ${spaceId}`;
+  await db()`delete from components where id = ${id} and space_id = ${spaceId}`;
   refresh();
 }
 
@@ -128,7 +128,7 @@ export async function useDesignSystem(formData: FormData) {
   const designSystemId = uuid(formData.get("designSystemId"));
   if (!spaceId || !designSystemId) return;
 
-  await sql`update spaces set design_system_id = ${designSystemId}
+  await db()`update spaces set design_system_id = ${designSystemId}
     where id = ${spaceId}
       and exists (select 1 from design_systems where id = ${designSystemId})`;
   refresh();

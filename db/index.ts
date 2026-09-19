@@ -1,6 +1,21 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
-export const sql = neon(process.env.DATABASE_URL!);
+type Client = NeonQueryFunction<false, false>;
+let client: Client | null = null;
+
+/**
+ * Lazy on purpose: creating the client at module scope makes `next build` die
+ * while it collects page data whenever DATABASE_URL is missing, which turns a
+ * config mistake into a confusing build failure.
+ */
+export function db(): Client {
+  if (!client) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL is not set — run `neon env pull`.");
+    client = neon(url);
+  }
+  return client;
+}
 
 type Row = Record<string, unknown>;
 
@@ -38,7 +53,7 @@ export type DesignSystem = {
 
 // The neon driver has no query fragments, so the space projection repeats.
 export const listSpaces = () =>
-  rows<Space>(sql`
+  rows<Space>(db()`
     select
       s.id, s.name, s.slug,
       (select count(*)::int from pages p where p.space_id = s.id) as page_count,
@@ -50,7 +65,7 @@ export const listSpaces = () =>
   `);
 
 export async function getSpace(slug: string) {
-  const found = await rows<Space>(sql`
+  const found = await rows<Space>(db()`
     select
       s.id, s.name, s.slug,
       (select count(*)::int from pages p where p.space_id = s.id) as page_count,
@@ -65,7 +80,7 @@ export async function getSpace(slug: string) {
 }
 
 export const listPages = (spaceId: string) =>
-  rows<PageRow>(sql`
+  rows<PageRow>(db()`
     select id, title, slug, created_at
     from pages
     where space_id = ${spaceId}
@@ -73,7 +88,7 @@ export const listPages = (spaceId: string) =>
   `);
 
 export const listComponents = (spaceId: string) =>
-  rows<ComponentRow>(sql`
+  rows<ComponentRow>(db()`
     select c.id, c.name, c.description,
       o.name as origin_name, os.name as origin_space_name
     from components c
@@ -85,7 +100,7 @@ export const listComponents = (spaceId: string) =>
 
 /** Components from other spaces this space has not imported yet. */
 export const listImportable = (spaceId: string) =>
-  rows<{ id: string; name: string; space_name: string }>(sql`
+  rows<{ id: string; name: string; space_name: string }>(db()`
     select c.id, c.name, s.name as space_name
     from components c
     join spaces s on s.id = c.space_id
@@ -98,7 +113,7 @@ export const listImportable = (spaceId: string) =>
   `);
 
 export const listDesignSystems = () =>
-  rows<DesignSystem>(sql`
+  rows<DesignSystem>(db()`
     select d.id, d.name, d.space_id, s.name as space_name,
       (select count(*)::int from jsonb_object_keys(d.tokens)) as token_count
     from design_systems d

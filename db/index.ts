@@ -31,6 +31,16 @@ export type Space = {
   component_count: number;
   design_system_id: string | null;
   design_system_name: string | null;
+  updated_at: string;
+};
+
+export type ActivityItem = {
+  id: string;
+  kind: "page" | "component";
+  title: string;
+  created_at: string;
+  space_name: string;
+  space_slug: string;
 };
 
 export type PageRow = { id: string; title: string; slug: string; created_at: string };
@@ -58,14 +68,33 @@ export const listSpaces = () =>
       s.id, s.name, s.slug,
       (select count(*)::int from pages p where p.space_id = s.id) as page_count,
       (select count(*)::int from components c where c.space_id = s.id) as component_count,
-      s.design_system_id, ds.name as design_system_name
+      s.design_system_id, ds.name as design_system_name,
+      greatest(
+        s.created_at,
+        coalesce((select max(p.created_at) from pages p where p.space_id = s.id), s.created_at),
+        coalesce((select max(c.created_at) from components c where c.space_id = s.id), s.created_at)
+      ) as updated_at
     from spaces s
     left join design_systems ds on ds.id = s.design_system_id
     order by s.created_at
   `);
 
+/** Newest rows across pages and components, for the dashboard activity list. */
+export const listRecentActivity = (limit = 5) =>
+  rows<ActivityItem>(db()`
+    select * from (
+      select p.id, 'page' as kind, p.title, p.created_at, s.name as space_name, s.slug as space_slug
+      from pages p join spaces s on s.id = p.space_id
+      union all
+      select c.id, 'component', c.name, c.created_at, s.name, s.slug
+      from components c join spaces s on s.id = c.space_id
+    ) recent
+    order by created_at desc
+    limit ${limit}
+  `);
+
 export async function getSpace(slug: string) {
-  const found = await rows<Space>(db()`
+  const found = await rows<Omit<Space, "updated_at">>(db()`
     select
       s.id, s.name, s.slug,
       (select count(*)::int from pages p where p.space_id = s.id) as page_count,

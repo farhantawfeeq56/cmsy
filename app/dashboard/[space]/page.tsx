@@ -20,7 +20,7 @@ import {
 const TABS = ["pages", "components", "design"] as const;
 type Tab = (typeof TABS)[number];
 
-/** Shared by the tiles and the row menus so popovers never inherit a stray style. */
+/** Shared by the New Page popover and the row menus. */
 const POPOVER =
   "absolute right-0 z-10 rounded-xl border border-line bg-white shadow-[0_6px_12px_#11111114]";
 const SUMMARY = "cursor-pointer list-none [&::-webkit-details-marker]:hidden";
@@ -35,40 +35,32 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
   if (!space) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-10">
-      <header className="flex flex-wrap items-start justify-between gap-6">
-        <div className="min-w-0">
-          <p className="text-sm text-smoke">/{space.slug}</p>
-          <h1 className="font-primary mt-1 text-4xl font-normal tracking-[-0.02em]">
-            {space.name}
-          </h1>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
-            Build and manage your pages, components and design system.
-          </p>
-        </div>
-
-        {/* No ⋯ menu here on purpose — a space has no rename or delete action yet. */}
-        <nav className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
-          {TABS.map((name) => (
-            <Link
-              key={name}
-              href={`/dashboard/${space.slug}?tab=${name}`}
-              className="tab capitalize"
-              data-active={tab === name}
-            >
-              {name === "design" ? "Design system" : name}
-            </Link>
-          ))}
-        </nav>
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
+      <header className="min-w-0">
+        <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">{space.name}</h1>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
+          Build and manage your pages, components and design system.
+        </p>
       </header>
 
-      <div className="mt-8 rounded-2xl border border-line bg-card p-5 sm:p-8">
-        {tab === "pages" && <PagesTab space={space} />}
-        {tab === "components" && <ComponentsTab spaceId={space.id} />}
-        {tab === "design" && (
-          <DesignTab spaceId={space.id} designSystemId={space.design_system_id} />
-        )}
-      </div>
+      {tab === "pages" ? (
+        <PagesTab space={space} />
+      ) : (
+        <div>
+          {/* The tiles are the way into these views, so they need a way back. */}
+          <Link
+            href={`/dashboard/${space.slug}?tab=pages`}
+            className="btn btn-quiet -ml-2.5 mb-4"
+          >
+            ← Pages
+          </Link>
+          {tab === "components" ? (
+            <ComponentsTab spaceId={space.id} />
+          ) : (
+            <DesignTab spaceId={space.id} designSystemId={space.design_system_id} />
+          )}
+        </div>
+      )}
     </main>
   );
 }
@@ -76,7 +68,6 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
 type SpaceSummary = {
   id: string;
   slug: string;
-  page_count: number;
   component_count: number;
   design_system_name: string | null;
 };
@@ -129,7 +120,10 @@ async function PagesTab({ space }: { space: SpaceSummary }) {
               {space.design_system_name ?? "Not set"}
             </span>
           </span>
-          <span aria-hidden className="shrink-0 text-smoke transition-colors group-hover:text-ink">
+          <span
+            aria-hidden
+            className="shrink-0 text-base text-smoke transition-colors group-hover:text-ink"
+          >
             →
           </span>
         </Link>
@@ -149,7 +143,11 @@ async function PagesTab({ space }: { space: SpaceSummary }) {
             <PlusIcon className="size-4" />
             New Page
           </summary>
-          <form action={createPage} className={`${POPOVER} mt-2 flex w-72 flex-col gap-3 p-4`}>
+          {/* w-72 with a small-screen cap so the panel never leaves the viewport. */}
+          <form
+            action={createPage}
+            className={`${POPOVER} mt-2 flex w-72 max-w-[80vw] flex-col gap-3 p-4`}
+          >
             <input type="hidden" name="spaceId" value={space.id} />
             <label className="label" htmlFor="new-page-title">
               Page title
@@ -246,7 +244,7 @@ async function ComponentsTab({ spaceId }: { spaceId: string }) {
             {components.map((component) => (
               <li
                 key={component.id}
-                className="flex flex-col gap-2 rounded-xl border border-line bg-white p-4"
+                className="card flex flex-col gap-2"
               >
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="font-primary text-base font-medium tracking-tight">
@@ -329,7 +327,7 @@ async function DesignTab({
 
   return (
     <section>
-      <div className="rounded-xl border border-line bg-white p-4">
+      <div className="card">
         <p className="label">In use</p>
         <h2 className="font-primary mt-1 text-xl font-medium tracking-tight">
           {current?.name ?? "No design system"}
@@ -350,7 +348,7 @@ async function DesignTab({
           {systems.map((system) => (
             <label
               key={system.id}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-white px-4 py-3"
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-card px-4 py-3"
             >
               <input
                 type="radio"

@@ -13,15 +13,35 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         <Link href="/" className="font-primary block px-2 text-lg font-semibold tracking-tight">
           CMSy
         </Link>
-        <nav className="mt-4 flex flex-wrap gap-1 lg:mt-8 lg:flex-col">
+        <nav className="mt-4 flex flex-wrap gap-1 lg:mt-6 lg:flex-col">
           <Link href="/dashboard" className="tab">
-            All spaces
+            Home
           </Link>
+          {/* Search and Settings are absent on purpose — no routes behind them yet. */}
+          {spaces.length > 0 && (
+            <p className="label mt-2 w-full px-2 lg:mt-4 lg:mb-1">Spaces</p>
+          )}
           {spaces.map((space) => (
-            <Link key={space.id} href={`/dashboard/${space.slug}`} className="tab">
-              {space.name}
+            <Link
+              key={space.id}
+              href={`/dashboard/${space.slug}`}
+              className="tab flex items-center gap-2"
+            >
+              <span
+                aria-hidden
+                className="font-primary flex size-6 shrink-0 items-center justify-center rounded-md border border-line bg-card text-xs font-semibold"
+              >
+                {space.name.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+              <span className="truncate">{space.name}</span>
             </Link>
           ))}
+          <Link href="/dashboard#new-space" className="tab mt-2 flex items-center gap-2">
+            <span aria-hidden className="flex size-6 shrink-0 items-center justify-center text-sm">
+              +
+            </span>
+            New Space
+          </Link>
         </nav>
       </aside>
       <div className="min-w-0 flex-1">{children}</div>

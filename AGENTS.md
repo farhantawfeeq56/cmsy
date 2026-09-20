@@ -24,16 +24,22 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 
 | Item | Value |
 |---|---|
-| Repo | `<github-org>/cmsy` |
-| Default branch | `main` (protected) |
-| Linear team key | `<TEAM>` (issues look like `<TEAM>-42`) |
-| Dev A / agent | `<name>` / Claude Code |
-| Dev B / agent | `<name>` / Pi (DeepSeek) |
-| Stack | `<language, framework, DB>` |
-| Install | `<command>` |
-| Run | `<command>` |
-| Test | `<command>` |
-| Lint / format | `<command>` |
+| Repo | `farhantawfeeq56/cmsy` (public) |
+| Default branch | `main` — **not yet protected**, see note below |
+| Linear team key | `SHY` (issues look like `SHY-42`), workspace `shypyard` |
+| Dev A / agent | Aathil Felix C — `@AathilFelix` / Claude Code |
+| Dev B / agent | Farhan Tawfeeq — `@farhantawfeeq56` / Pi (DeepSeek) |
+| Stack | TypeScript · Next.js 16 App Router (React 19, RSC) built with vinext · Cloudflare Workers · Neon Postgres · Tailwind v4 |
+| Install | `npm ci` |
+| Run | `npm run dev` (Next dev server) — or `npm run dev:vinext` (port 3001) to match the deployed Workers runtime |
+| Test | **none yet** — no test runner is configured. §3.3's "add or update tests" rule cannot be honoured until one exists. |
+| Lint / format | `npm run lint` (ESLint 9 + `eslint-config-next`) |
+
+> **`main` is not actually protected.** `GET /repos/farhantawfeeq56/cmsy/branches/main` reports
+> `"protected": false`, so §1 rules 1 and 4 (no direct pushes, no self-merges) are currently
+> honour-system only — nothing enforces them. Only `@farhantawfeeq56` holds admin on the repo
+> and can enable branch protection; `@AathilFelix` cannot. Until that is turned on, treat those
+> rules as a promise between the two of you rather than a guarantee.
 
 You act **on behalf of your human owner**. They approve anything risky, ambiguous, or irreversible.
 

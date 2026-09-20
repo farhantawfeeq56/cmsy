@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "db:push": "node --env-file=.env.local db/migrate.mjs",
-    "build": "next build",
+    "build": "vinext build",
+    "build:next": "next build",
     "start": "next start",
     "lint": "eslint",
     "dev:vinext": "vinext dev --port 3001",

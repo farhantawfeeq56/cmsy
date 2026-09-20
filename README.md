@@ -80,8 +80,12 @@ endpoint is live.
 ```bash
 neon env pull   # writes .env.local with DATABASE_URL
 npm run db:push # apply db/schema.sql
-npm run dev     # MCP server at http://localhost:3000/api/mcp
+npm run dev     # MCP server at http://localhost:3000/api/mcp (Next)
+npm run dev:vinext  # ...or http://localhost:3001/api/mcp (Cloudflare runtime)
 ```
+
+Deployed on Cloudflare Workers at
+`https://cmsy.webdesignbyft.workers.dev/api/mcp`.
 
 ### Connecting an agent
 
@@ -112,9 +116,9 @@ Tool definitions live in `mcp/server.ts`, deliberately free of Next.js
 imports so the same tools can later be served from a stdio process.
 `app/api/mcp/route.ts` is only the HTTP glue.
 
-> **Note:** the endpoint is currently unauthenticated and intended for local
-> development. Auth is configured in `neon.ts` but not yet wired into this
-> route — do not expose it on a public deployment as-is.
+> **Note:** the endpoint is currently unauthenticated. Auth is configured in
+> `neon.ts` but not yet wired into this route — the deployed Worker exposes
+> `/api/mcp` publicly, so add auth before sharing the URL.
 
 ## Why CMSy?
 

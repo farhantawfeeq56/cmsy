@@ -203,12 +203,93 @@ async function PagesTab({ space }: { space: SpaceSummary }) {
   );
 }
 
+/* Visual preview per component, inferred from its name — no stored code yet,
+   so the name is the only signal. Static mock, never interactive. */
+function previewKind(name: string) {
+  const n = name.toLowerCase();
+  if (/(button|cta|action)/.test(n)) return "button";
+  if (/(input|field|form|search|textarea)/.test(n)) return "input";
+  if (/(badge|pill|tag|chip|status)/.test(n)) return "badge";
+  if (/(nav|header|hero|banner|footer|menu)/.test(n)) return "hero";
+  if (/(card|panel|tile|feature|pricing|testimonial)/.test(n)) return "card";
+  return "generic";
+}
+
+function ComponentPreview({ name, description }: { name: string; description: string }) {
+  const kind = previewKind(name);
+  const label = name.length > 18 ? `${name.slice(0, 17).trimEnd()}…` : name;
+  const sub = description.length > 40 ? `${description.slice(0, 39).trimEnd()}…` : description;
+
+  switch (kind) {
+    case "button":
+      return (
+        <span className="btn pointer-events-none select-none" aria-hidden>
+          {label || "Button"}
+        </span>
+      );
+    case "input":
+      return (
+        <span className="pointer-events-none block w-full max-w-55 select-none" aria-hidden>
+          <span className="input block truncate text-left text-smoke">
+            {sub || "Placeholder…"}
+          </span>
+          <span className="btn mt-2 inline-flex">{label || "Submit"}</span>
+        </span>
+      );
+    case "badge":
+      return (
+        <span className="pointer-events-none flex flex-wrap items-center justify-center gap-2 select-none" aria-hidden>
+          <span className="badge bg-mint">{label || "New"}</span>
+          <span className="badge bg-butter">{label || "Review"}</span>
+          <span className="badge bg-lilac">{label || "Live"}</span>
+        </span>
+      );
+    case "hero":
+      return (
+        <span className="pointer-events-none block w-full max-w-55 select-none" aria-hidden>
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-ember" />
+            <span className="size-1.5 rounded-full bg-butter" />
+            <span className="size-1.5 rounded-full bg-mint" />
+          </span>
+          <span className="font-primary mt-2 block truncate text-base font-medium tracking-tight">
+            {label}
+          </span>
+          <span className="mt-1.5 block h-1.5 w-3/4 rounded-full bg-ink/10" />
+          <span className="mt-1.5 block h-1.5 w-1/2 rounded-full bg-ink/10" />
+          <span className="btn mt-2.5 inline-flex text-xs">Get started</span>
+        </span>
+      );
+    case "card":
+      return (
+        <span className="pointer-events-none block w-full max-w-55 rounded-lg border border-line bg-white p-3 text-left select-none" aria-hidden>
+          <span className="block h-10 rounded-md bg-mint" />
+          <span className="font-primary mt-2 block truncate text-sm font-medium">{label}</span>
+          <span className="mt-1.5 block h-1.5 w-full rounded-full bg-ink/10" />
+          <span className="mt-1.5 block h-1.5 w-2/3 rounded-full bg-ink/10" />
+        </span>
+      );
+    default:
+      return (
+        <span className="pointer-events-none flex w-full max-w-55 items-center gap-3 select-none" aria-hidden>
+          <span className="font-primary flex size-10 shrink-0 items-center justify-center rounded-lg bg-lilac text-sm font-semibold">
+            {label.trim().charAt(0).toUpperCase() || "?"}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{label}</span>
+            <span className="mt-1.5 block h-1.5 w-full rounded-full bg-ink/10" />
+            <span className="mt-1.5 block h-1.5 w-2/3 rounded-full bg-ink/10" />
+          </span>
+        </span>
+      );
+  }
+}
+
 async function ComponentsTab({ spaceId }: { spaceId: string }) {
   const [components, importable] = await Promise.all([
     listComponents(spaceId),
     listImportable(spaceId),
   ]);
-
   return (
     <section className="space-y-8">
       <div>
@@ -244,32 +325,38 @@ async function ComponentsTab({ spaceId }: { spaceId: string }) {
             {components.map((component) => (
               <li
                 key={component.id}
-                className="card flex flex-col gap-2"
+                className="flex flex-col overflow-hidden rounded-xl border border-line bg-card"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-primary text-base font-medium tracking-tight">
-                    {component.name}
-                  </h3>
-                  <form action={deleteComponent}>
-                    <input type="hidden" name="id" value={component.id} />
-                    <input type="hidden" name="spaceId" value={spaceId} />
-                    <button type="submit" className="btn-quiet">
-                      Delete
-                    </button>
-                  </form>
+                {/* Preview first — every component reads visually, not just by name. */}
+                <div className="flex h-36 items-center justify-center border-b border-line bg-paper p-4">
+                  <ComponentPreview name={component.name} description={component.description} />
                 </div>
-                {component.description && (
-                  <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
-                )}
-                <p className="mt-auto">
-                  {component.origin_space_name ? (
-                    <span className="badge">
-                      Imported · {component.origin_name} from {component.origin_space_name}
-                    </span>
-                  ) : (
-                    <span className="badge badge-quiet">Local</span>
+                <div className="flex flex-1 flex-col gap-2 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-primary text-base font-medium tracking-tight">
+                      {component.name}
+                    </h3>
+                    <form action={deleteComponent}>
+                      <input type="hidden" name="id" value={component.id} />
+                      <input type="hidden" name="spaceId" value={spaceId} />
+                      <button type="submit" className="btn-quiet">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                  {component.description && (
+                    <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
                   )}
-                </p>
+                  <p className="mt-auto pt-1">
+                    {component.origin_space_name ? (
+                      <span className="badge">
+                        Imported · {component.origin_name} from {component.origin_space_name}
+                      </span>
+                    ) : (
+                      <span className="badge badge-quiet">Local</span>
+                    )}
+                  </p>
+                </div>
               </li>
             ))}
           </ul>

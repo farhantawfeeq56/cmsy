@@ -7,27 +7,38 @@
     "db:push": "node --env-file=.env.local db/migrate.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:vinext": "vinext dev --port 3001",
+    "build:vinext": "vinext build",
+    "start:vinext": "wrangler dev --config dist/server/wrangler.json",
+    "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
     "@neon/config": "^1.7.0",
     "@neon/env": "^1.4.1",
     "@neondatabase/serverless": "^1.1.0",
+    "@vinext/cloudflare": "^1.0.0-beta.8",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "react-server-dom-webpack": "^19.2.6",
+    "vinext": "^1.0.0-beta.10"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.56.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-rsc": "^0.5.35",
     "agentation": "^3.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "type": "module"
 }

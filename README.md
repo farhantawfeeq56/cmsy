@@ -71,6 +71,55 @@ This makes it possible to move from:
 Design / Edit → Structured instruction → Agent → Codebase
 ```
 
+## Running the MCP server
+
+The CMSy MCP server is served by the app itself, over Streamable HTTP at
+`/api/mcp`. There is no separate process to start — run the app and the
+endpoint is live.
+
+```bash
+neon env pull   # writes .env.local with DATABASE_URL
+npm run db:push # apply db/schema.sql
+npm run dev     # MCP server at http://localhost:3000/api/mcp (Next)
+npm run dev:vinext  # ...or http://localhost:3001/api/mcp (Cloudflare runtime)
+```
+
+Deployed on Cloudflare Workers at
+`https://cmsy.webdesignbyft.workers.dev/api/mcp`.
+
+### Connecting an agent
+
+This repo ships a `.mcp.json`, so agents that read project-level MCP config
+(Claude Code, Cursor, Codex) pick the server up automatically when started
+from the repo root. To register it by hand:
+
+```bash
+claude mcp add --transport http cmsy http://localhost:3000/api/mcp
+```
+
+Verify the connection without an agent:
+
+```bash
+curl -s -X POST http://localhost:3000/api/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+### Tools
+
+| Tool | Description |
+| --- | --- |
+| `list_spaces` | Lists every space — a CMSy project, owning its own pages, components and design system. Read-only. |
+
+Tool definitions live in `mcp/server.ts`, deliberately free of Next.js
+imports so the same tools can later be served from a stdio process.
+`app/api/mcp/route.ts` is only the HTTP glue.
+
+> **Note:** the endpoint is currently unauthenticated. Auth is configured in
+> `neon.ts` but not yet wired into this route — the deployed Worker exposes
+> `/api/mcp` publicly, so add auth before sharing the URL.
+
 ## Why CMSy?
 
 Traditional CMSs generally separate content from the application's codebase.

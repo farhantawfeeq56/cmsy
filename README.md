@@ -116,9 +116,39 @@ Tool definitions live in `mcp/server.ts`, deliberately free of Next.js
 imports so the same tools can later be served from a stdio process.
 `app/api/mcp/route.ts` is only the HTTP glue.
 
-> **Note:** the endpoint is currently unauthenticated. Auth is configured in
-> `neon.ts` but not yet wired into this route — the deployed Worker exposes
-> `/api/mcp` publicly, so add auth before sharing the URL.
+### Auth
+
+Local dev (loopback hosts) needs no token — the checked-in `.mcp.json`
+connects in one step. Any non-loopback host requires a bearer token:
+
+```bash
+openssl rand -hex 32   # generate once, then add to .env.local:
+# MCP_AUTH_TOKEN=<output>
+```
+
+The same variable must be set where the app is deployed (e.g.
+`wrangler secret put MCP_AUTH_TOKEN`). Without it the deployed endpoint
+refuses every non-loopback request with `401` rather than serving openly.
+
+To connect an agent to a deployed instance, register the server with an
+`Authorization` header:
+
+```json
+{
+  "mcpServers": {
+    "cmsy": {
+      "type": "http",
+      "url": "https://<your-deploy>/api/mcp",
+      "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
+    }
+  }
+}
+```
+
+Unauthenticated calls get a `401` + `WWW-Authenticate: Bearer` challenge;
+requests with a forged `Origin` get `403`. The token is a shared secret
+(there is no login flow issuing per-user tokens yet) — rotate it with
+`openssl rand` and update the secret wherever it is stored.
 
 ## Why CMSy?
 

@@ -7,6 +7,9 @@ import {
   requireBearerAuth,
   validateOriginHeader,
 } from "@modelcontextprotocol/server";
+import { authenticateMcpToken } from "@/db";
+import { LOOPBACK, hostnameOf, isLoopbackHost } from "@/mcp/endpoint";
+import { hashToken, isIssuedToken } from "@/mcp/tokens";
 import { createCmsyMcpServer } from "@/mcp/server";
 
 // The handler talks to Postgres per request and must never be prerendered.
@@ -17,30 +20,66 @@ const handler = createMcpHandler(createCmsyMcpServer, {
   onerror: (error) => console.error("[mcp]", error),
 });
 
-// Requests aimed at these hosts are local dev: no bearer token needed, so the
-// checked-in `.mcp.json` connects in one step without committing a secret.
-const LOOPBACK = ["localhost", "127.0.0.1", "[::1]", "::1"];
+/**
+ * The SDK rejects an `AuthInfo` with no `expiresAt` and offers no way to opt
+ * out, so every credential here has to claim one. It is a formality rather than
+ * a lifetime: the verifier runs on every request, so an issued token's real
+ * validity is whatever `mcp_tokens.revoked_at` says at that moment, and a
+ * revoked token stops working immediately regardless of this window.
+ */
+const ASSERTED_TTL_SECONDS = 3600;
 
-// ponytail: shared-secret bearer token, not Neon Auth JWTs — there is no
-// login flow issuing user tokens yet, and a high-entropy secret over HTTPS is
-// enough to gate a read-only tool. Per-user JWT verification is the follow-up.
+const expiry = () => Math.floor(Date.now() / 1000) + ASSERTED_TTL_SECONDS;
+
+/** Constant-time compare that tolerates a length mismatch. */
+function sameSecret(presented: string, configured: string): boolean {
+  const a = Buffer.from(presented);
+  const b = Buffer.from(configured);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Two credentials are accepted, in this order:
+ *
+ *  1. A token issued by /dashboard/connect. Only its SHA-256 is stored, so the
+ *     lookup hashes what was presented; the same statement rejects revoked rows
+ *     and stamps `last_used_at`, which is what makes the dashboard's "last
+ *     used" column and its Revoke button mean anything.
+ *  2. The `MCP_AUTH_TOKEN` shared secret, kept so deployments that predate
+ *     issuance keep working. It has no owner and no audit trail — prefer an
+ *     issued token, and see #24 for retiring it.
+ *
+ * Neon Auth JWTs are deliberately not handled here; that is #24.
+ */
 const verifier = {
   async verifyAccessToken(token: string): Promise<AuthInfo> {
-    const expected = process.env.MCP_AUTH_TOKEN;
-    if (!expected) {
-      console.error("[mcp] refusing non-loopback request: MCP_AUTH_TOKEN is not set");
-      throw new OAuthError(OAuthErrorCode.ServerError, "MCP auth is not configured on this server");
+    if (isIssuedToken(token)) {
+      const row = await authenticateMcpToken(await hashToken(token));
+      // Unknown and revoked are one answer on purpose: a caller must not be
+      // able to probe which of its tokens still exist.
+      if (!row) throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
+      return {
+        token,
+        clientId: `cmsy-token:${row.id}`,
+        scopes: [],
+        expiresAt: expiry(),
+        extra: { owner: row.owner, tokenName: row.name },
+      };
     }
-    const presented = Buffer.from(token);
-    const configured = Buffer.from(expected);
-    if (presented.length !== configured.length || !timingSafeEqual(presented, configured)) {
+
+    const shared = process.env.MCP_AUTH_TOKEN;
+    if (!shared) {
+      console.error("[mcp] refusing non-loopback request: no issued token matched and MCP_AUTH_TOKEN is not set");
+      throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
+    }
+    if (!sameSecret(token, shared)) {
       throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
     }
     return {
       token,
       clientId: "cmsy-agent",
       scopes: [],
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      expiresAt: expiry(),
     };
   },
 };
@@ -56,15 +95,10 @@ function forbidden(message: string): Response {
 
 async function guarded(request: Request): Promise<Response> {
   // 1. Host must parse — the start of the DNS-rebinding defence.
-  let hostname = "";
-  try {
-    hostname = new URL(`http://${request.headers.get("host")}`).hostname;
-  } catch {
-    return forbidden("Invalid Host header");
-  }
-  if (!hostname) return forbidden("Missing Host header");
+  const hostname = hostnameOf(request.headers.get("host"));
+  if (!hostname) return forbidden("Missing or invalid Host header");
 
-  const loopback = LOOPBACK.includes(hostname);
+  const loopback = isLoopbackHost(hostname);
 
   // 2. When a browser sends Origin it must match the destination (loopback
   // servers only accept loopback origins). Non-browser MCP clients send no

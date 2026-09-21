@@ -149,3 +149,54 @@ export const listDesignSystems = () =>
     left join spaces s on s.id = d.space_id
     order by d.created_at
   `);
+
+export type McpToken = {
+  id: string;
+  owner: string;
+  name: string;
+  token_prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
+/** Live tokens first, newest first, so the useful rows stay above the fold. */
+export const listMcpTokens = () =>
+  rows<McpToken>(db()`
+    select id, owner, name, token_prefix, created_at, last_used_at, revoked_at
+    from mcp_tokens
+    order by (revoked_at is not null), created_at desc
+  `);
+
+export async function insertMcpToken(token: {
+  owner: string;
+  name: string;
+  prefix: string;
+  hash: string;
+}) {
+  const [row] = await rows<{ id: string }>(db()`
+    insert into mcp_tokens (owner, name, token_prefix, token_hash)
+    values (${token.owner}, ${token.name}, ${token.prefix}, ${token.hash})
+    returning id
+  `);
+  return row ?? null;
+}
+
+export const revokeMcpToken = (id: string) =>
+  db()`update mcp_tokens set revoked_at = now() where id = ${id} and revoked_at is null`;
+
+/**
+ * Authenticates a presented token in one statement: the `where` does the lookup
+ * and the revoked check, and only a matching live row gets its `last_used_at`
+ * stamped. Returns null for unknown *and* revoked tokens — the caller must not
+ * be able to tell those apart.
+ */
+export async function authenticateMcpToken(hash: string) {
+  const [row] = await rows<{ id: string; owner: string; name: string }>(db()`
+    update mcp_tokens
+    set last_used_at = now()
+    where token_hash = ${hash} and revoked_at is null
+    returning id, owner, name
+  `);
+  return row ?? null;
+}

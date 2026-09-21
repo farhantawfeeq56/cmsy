@@ -42,3 +42,24 @@ create table if not exists components (
 create index if not exists pages_space_idx on pages (space_id);
 create index if not exists components_space_idx on components (space_id);
 create index if not exists design_systems_space_idx on design_systems (space_id);
+
+-- Agent credentials for /api/mcp. Only the hash is stored: the plaintext is
+-- shown once at issuance and is unrecoverable afterwards, so a leaked database
+-- dump yields no working tokens.
+--
+-- `owner` is a sentinel ('local') until a login flow exists — nothing in the app
+-- signs anyone in yet (#21), so every token belongs to whoever can reach the
+-- dashboard. TODO(#24): populate it with the Neon Auth subject once JWTs are
+-- verified, which needs no migration.
+create table if not exists mcp_tokens (
+  id uuid primary key default gen_random_uuid(),
+  owner text not null default 'local',
+  name text not null,
+  token_prefix text not null,
+  token_hash text not null unique,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  revoked_at timestamptz
+);
+
+create index if not exists mcp_tokens_owner_idx on mcp_tokens (owner);

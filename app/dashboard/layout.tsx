@@ -17,6 +17,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <Link href="/dashboard" className="tab">
             Home
           </Link>
+          <Link href="/dashboard/connect" className="tab">
+            Connect agent
+          </Link>
           {/* Search and Settings are absent on purpose — no routes behind them yet. */}
           {spaces.length > 0 && (
             <p className="label mt-2 w-full px-2 lg:mt-4 lg:mb-1">Spaces</p>

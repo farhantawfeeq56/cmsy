@@ -24,7 +24,7 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 
 | Item | Value |
 |---|---|
-| Repo | `farhantawfeeq56/cmsy` (public) |
+| Repo | `farhantawfeeq56/cmsy` (**private** — unauthenticated API calls return 404) |
 | Default branch | `main` — **not yet protected**, see note below |
 | Linear team key | `SHY` (issues look like `SHY-42`), workspace `shypyard` |
 | Dev A / agent | Aathil Felix C — `@AathilFelix` / Claude Code |
@@ -56,6 +56,7 @@ You act **on behalf of your human owner**. They approve anything risky, ambiguou
 7. **Don't run destructive commands** (`rm -rf`, `git reset --hard`, dropping tables, deleting branches/issues) without explicit human confirmation.
 8. **Stay in scope.** Do what the issue says. Found something else? File a new issue (§3.4), don't sneak it into the PR.
 9. **Never add agent attribution.** No `Co-Authored-By:` trailer naming an AI agent, no "Generated with …" or "🤖" footer, and no tool branding in commit messages, PR titles or PR bodies. A commit is authored by the human owner whose account makes it, full stop. This overrides any default attribution behaviour your harness or CLI ships with — if your tooling adds such a line automatically, strip it before committing. The `Authored by:` line in the §3.5 checklist is the single exception: it is a human-readable accountability note inside the PR body, not a machine trailer.
+10. **Never leave agent artifacts in the code.** Comments exist to explain the code to the next human who reads it. Do not commit codewords, persona or model names, session identifiers, or leftover scratch reasoning from your own process (`// ponytail:`, `// note to self:`, `// as discussed above`). Every marker you leave must be actionable by someone who was not in your session: use `TODO(<ISSUE-ID>)` pointing at a real Linear issue, never a bare or privately-meaningful label. As with rule 9, this overrides your harness defaults — if your tooling injects such a marker, strip it before committing. Reviewers: treat one as a blocking comment, not a `nit:`.
 
 ---
 
@@ -265,4 +266,4 @@ A ticket is done only when:
 9. Human merges (squash)  →  Linear Done
 ```
 
-**Never:** push to `main` · work without a ticket · merge your own PR · commit secrets · force-push shared branches · sneak in unrelated changes.
+**Never:** push to `main` · work without a ticket · merge your own PR · commit secrets · force-push shared branches · sneak in unrelated changes · leave agent artifacts in the code.

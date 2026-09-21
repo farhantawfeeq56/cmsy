@@ -27,7 +27,7 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 | Repo | `farhantawfeeq56/cmsy` (**private** — unauthenticated API calls return 404) |
 | Default branch | `main` — **not yet protected**, see note below |
 | Issue tracker | **GitHub Issues** on this repo (issues look like `#42`) — see §0.1 |
-| Project board | [`cmsy`](https://github.com/users/AathilFelix/projects/1) — a Projects v2 board carrying the Status and Priority fields |
+| Project board | [`cmsy`](https://github.com/users/AathilFelix/projects/1) — a Projects v2 board carrying the Status and Priority fields. Owned by `@AathilFelix`; see §0.1 |
 | Dev A / agent | Aathil Felix C — `@AathilFelix` / Claude Code |
 | Dev B / agent | Farhan Tawfeeq — `@farhantawfeeq56` / Pi (DeepSeek) |
 | Stack | TypeScript · Next.js 16 App Router (React 19, RSC) built with vinext · Cloudflare Workers · Neon Postgres · Tailwind v4 |
@@ -47,6 +47,33 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > Tracked in #23. Until then, treat those rules as a promise between the two of you.
 
 You act **on behalf of your human owner**. They approve anything risky, ambiguous, or irreversible.
+
+### 0.1 Tracking and merge conventions
+
+**Issues live on GitHub.** The Linear workspace (`shypyard`, team `SHY`) is read-only history — see
+§9. `SHY-5` … `SHY-18` are now `#14` … `#27`.
+
+**The board is owned by `@AathilFelix`, not by the repo owner.** This is deliberate, not an
+accident of who set it up. A Projects v2 board can only be linked to a repository owned by the same
+account, so a board owned by `@AathilFelix` cannot appear under this repo's **Projects** tab. That
+cost was accepted: `@farhantawfeeq56` holds **ADMIN** on the board, the automation works regardless,
+and the only loss is a tab. Transfer to `@farhantawfeeq56` stays available if he wants it — the
+population script takes `--owner` and `--number`, so it is one command rather than a rebuild.
+Decided in #28.
+
+**Status is automated.** `project-autoadd.yml` puts every new issue on the board in `Backlog`;
+`project-status.yml` moves it to `In Review` when its PR opens and `Done` when it merges, driven by
+the `Closes #<number>` line in the PR body. Both are verified working. You should rarely need to
+move a card by hand — the exception is setting `In Progress` when you start (§3.1).
+
+**Standing merge authorisation.** `@farhantawfeeq56` has given `@AathilFelix` explicit standing
+permission to merge PRs on this project. That is why PRs authored by `@AathilFelix` may be merged
+by `@AathilFelix` without it being a lapse.
+
+This does **not** relax hard rule 4. Rule 4 binds *you*, the agent: never merge a PR you opened,
+and never merge on your own initiative. The authorisation is between the two humans and concerns
+who may press the button, not whether review happens. A non-trivial change still wants the other
+dev's eyes on it, and an agent still waits to be told.
 
 ---
 

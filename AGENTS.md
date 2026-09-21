@@ -97,11 +97,12 @@ Moving an issue means moving its card, not editing the issue.
    - **Assignee:** your human owner.
    - **Milestone:** if the work belongs to one.
 3. **Check for overlap.** Look at what is `In Progress` on the board. If another issue touches the same files or module, say so in a comment and coordinate (tag the other dev) before starting.
-4. **Add it to the board** and set Status to **In Progress**, then leave a one-line comment on your plan (`Plan: add endpoint in api/auth, unit tests, no schema change`).
+4. A new issue lands on the board in **Backlog** automatically. When you start work, set its
+   Status to **In Progress** and leave a one-line comment on your plan (`Plan: add endpoint in
+   api/auth, unit tests, no schema change`). If a card is somehow missing:
    ```bash
    gh project item-add 1 --owner AathilFelix --url <issue-url>
    ```
-   The board is not yet linked to the repo, so new issues do **not** get added automatically — see #28.
 
 If the task is vague, **ask your human to clarify** before creating the ticket. Don't invent requirements.
 

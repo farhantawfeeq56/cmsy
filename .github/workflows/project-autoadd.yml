@@ -1,0 +1,101 @@
+name: Add new issues to the project board
+
+# GitHub's built-in "auto-add items from this repository" workflow requires the
+# board and the repo to share an owner, which they do not here (see #28). This
+# reproduces it: every new issue lands on the board in Backlog, so no issue can
+# sit without a Status. AGENTS.md §4 depends on that — an issue with no card has
+# no status.
+#
+# Same PROJECT_TOKEN / PROJECT_OWNER / PROJECT_NUMBER setup as
+# project-status.yml; skips loudly if the token is absent.
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+
+permissions:
+  contents: read
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the project token
+        id: guard
+        env:
+          TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "PROJECT_TOKEN is not set — skipping. See issue #28." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.guard.outputs.ok == 'true'
+        uses: actions/github-script@v7
+        env:
+          PROJECT_OWNER: ${{ vars.PROJECT_OWNER }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const owner  = process.env.PROJECT_OWNER;
+            const number = parseInt(process.env.PROJECT_NUMBER, 10);
+            if (!owner || !number) {
+              core.setFailed('PROJECT_OWNER / PROJECT_NUMBER repository variables are not set.');
+              return;
+            }
+
+            const { user } = await github.graphql(`
+              query($owner:String!, $number:Int!) {
+                user(login:$owner) {
+                  projectV2(number:$number) {
+                    id
+                    field(name:"Status") {
+                      ... on ProjectV2SingleSelectField { id options { id name } }
+                    }
+                    items(first:100) {
+                      nodes { id content { ... on Issue { number } } }
+                    }
+                  }
+                }
+              }`, { owner, number });
+
+            const project = user.projectV2;
+            const issue   = context.payload.issue;
+
+            // Reopened and transferred issues may already have a card; adding a
+            // second one would split the issue's history across two rows.
+            const existing = project.items.nodes.find(
+              n => n.content && n.content.number === issue.number);
+            if (existing) {
+              core.info(`#${issue.number} is already on the board.`);
+              return;
+            }
+
+            const { addProjectV2ItemById: added } = await github.graphql(`
+              mutation($project:ID!, $content:ID!) {
+                addProjectV2ItemById(input:{ projectId:$project, contentId:$content }) {
+                  item { id }
+                }
+              }`, { project: project.id, content: issue.node_id });
+
+            const backlog = project.field.options.find(o => o.name === 'Backlog');
+            if (!backlog) {
+              core.warning('Status field has no "Backlog" option; card added without a status.');
+              return;
+            }
+
+            await github.graphql(`
+              mutation($project:ID!, $item:ID!, $field:ID!, $option:String!) {
+                updateProjectV2ItemFieldValue(input:{
+                  projectId:$project, itemId:$item, fieldId:$field,
+                  value:{ singleSelectOptionId:$option }
+                }) { projectV2Item { id } }
+              }`, {
+                project: project.id, item: added.item.id,
+                field: project.field.id, option: backlog.id,
+              });
+
+            core.info(`#${issue.number} added to the board in Backlog.`);

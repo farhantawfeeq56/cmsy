@@ -1,0 +1,119 @@
+name: Sync project board status
+
+# The board's Status field is what carries In Review and Done; a GitHub issue
+# itself only knows open and closed. This workflow keeps the field in step with
+# the PR lifecycle so nobody has to drag cards: opening a PR moves every issue
+# it closes to In Review, merging it moves them to Done.
+#
+# Requires a PROJECT_TOKEN secret — a PAT with the `project` scope. The default
+# GITHUB_TOKEN cannot write to a Projects v2 board, and a board owned by a
+# different account than the repo cannot be reached by it at all. Without the
+# secret this workflow skips loudly rather than failing or silently doing
+# nothing. See issue #28.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the project token
+        id: guard
+        env:
+          TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "PROJECT_TOKEN is not set — skipping. See issue #28." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.guard.outputs.ok == 'true'
+        uses: actions/github-script@v7
+        env:
+          PROJECT_OWNER: ${{ vars.PROJECT_OWNER }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+
+            // Merged closes the work; closed-without-merge leaves it alone,
+            // because the issue is still open and still needs doing.
+            if (pr.state === 'closed' && !pr.merged) {
+              core.info('PR closed without merging; leaving board untouched.');
+              return;
+            }
+            const target = pr.merged ? 'Done' : 'In Review';
+
+            // GitHub resolves closing keywords itself, so read them back rather
+            // than re-parsing the body and getting the edge cases wrong.
+            const { repository } = await github.graphql(`
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    closingIssuesReferences(first:20) { nodes { number id } }
+                  }
+                }
+              }`, { ...context.repo, number: pr.number });
+
+            const issues = repository.pullRequest.closingIssuesReferences.nodes;
+            if (issues.length === 0) {
+              core.info('PR closes no issues; nothing to move.');
+              return;
+            }
+
+            const owner  = process.env.PROJECT_OWNER;
+            const number = parseInt(process.env.PROJECT_NUMBER, 10);
+            if (!owner || !number) {
+              core.setFailed('PROJECT_OWNER / PROJECT_NUMBER repository variables are not set.');
+              return;
+            }
+
+            const { user } = await github.graphql(`
+              query($owner:String!, $number:Int!) {
+                user(login:$owner) {
+                  projectV2(number:$number) {
+                    id
+                    field(name:"Status") {
+                      ... on ProjectV2SingleSelectField { id options { id name } }
+                    }
+                    items(first:100) {
+                      nodes { id content { ... on Issue { number } } }
+                    }
+                  }
+                }
+              }`, { owner, number });
+
+            const project = user.projectV2;
+            const option  = project.field.options.find(o => o.name === target);
+            if (!option) {
+              core.setFailed(`Status field has no "${target}" option.`);
+              return;
+            }
+
+            for (const issue of issues) {
+              const item = project.items.nodes.find(
+                n => n.content && n.content.number === issue.number);
+              if (!item) {
+                core.warning(`Issue #${issue.number} is not on the board; skipped.`);
+                continue;
+              }
+              await github.graphql(`
+                mutation($project:ID!, $item:ID!, $field:ID!, $option:String!) {
+                  updateProjectV2ItemFieldValue(input:{
+                    projectId:$project, itemId:$item, fieldId:$field,
+                    value:{ singleSelectOptionId:$option }
+                  }) { projectV2Item { id } }
+                }`, {
+                  project: project.id, item: item.id,
+                  field: project.field.id, option: option.id,
+                });
+              core.info(`#${issue.number} -> ${target}`);
+            }

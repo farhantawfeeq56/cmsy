@@ -1,0 +1,89 @@
+name: Record Cloudflare deployments
+
+# Cloudflare Workers Builds reports through a check run, not the GitHub
+# Deployments API, so the repo's Environments page stays empty on its own.
+# This workflow listens for that check run and mirrors each build into a
+# deployment record so Production and Preview show live links.
+
+on:
+  check_run:
+    types: [completed]
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  record:
+    # Double-quoted: the colon inside the check-run name would otherwise end
+    # the YAML scalar early.
+    if: "github.event.check_run.name == 'Workers Builds: cmsy'"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run    = context.payload.check_run;
+            const branch = run.check_suite.head_branch;
+            const sha    = run.head_sha;
+            const ok     = run.conclusion === 'success';
+
+            if (!branch) {
+              core.info('Check run has no head_branch; nothing to record.');
+              return;
+            }
+
+            // Cloudflare derives a branch preview hostname by lowercasing the
+            // branch and collapsing every non-alphanumeric run into a hyphen.
+            // Verified against PR #9 (fix/workers-builds-vinext) and PR #10
+            // (docs/SHY-11-agents-md-team-table). The label is capped so that
+            // "<alias>-cmsy" stays inside the 63-char DNS limit.
+            const alias = branch
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 58)
+              .replace(/-+$/, '');
+
+            const isProd = branch === 'main';
+            const url = isProd
+              ? 'https://cmsy.webdesignbyft.workers.dev'
+              : `https://${alias}-cmsy.webdesignbyft.workers.dev`;
+
+            const { owner, repo } = context.repo;
+
+            const deployment = await github.rest.repos.createDeployment({
+              owner,
+              repo,
+              ref: sha,
+              environment: isProd ? 'Production' : 'Preview',
+              description: isProd
+                ? 'Cloudflare Workers production deploy'
+                : `Cloudflare Workers preview — ${branch}`,
+              auto_merge: false,
+              required_contexts: [],
+              production_environment: isProd,
+              transient_environment: !isProd,
+            });
+
+            // A 202 means GitHub accepted the request but merged it away, so
+            // there is no deployment id to attach a status to.
+            const id = deployment.data.id;
+            if (!id) {
+              core.warning(`No deployment created: ${deployment.data.message}`);
+              return;
+            }
+
+            await github.rest.repos.createDeploymentStatus({
+              owner,
+              repo,
+              deployment_id: id,
+              state: ok ? 'success' : 'failure',
+              // Only advertise a URL for a build that actually shipped.
+              ...(ok ? { environment_url: url } : {}),
+              log_url: run.details_url,
+              description: ok ? 'Deployed by Workers Builds' : 'Workers Builds failed',
+              auto_inactive: true,
+            });
+
+            core.info(`${isProd ? 'Production' : 'Preview'} #${id} -> ${ok ? url : 'failed'}`);

@@ -30,7 +30,7 @@ function slugify(value: string) {
  * so we retry with a numeric suffix. Race-safe because the unique index decides.
  */
 async function insertWithSlug(
-  run: (slug: string) => PromiseLike<Record<string, any>[]>,
+  run: (slug: string) => PromiseLike<Record<string, unknown>[]>,
   base: string,
 ): Promise<{ id: string } | null> {
   for (let attempt = 1; attempt <= 50; attempt++) {

@@ -41,6 +41,7 @@ export async function issueToken(_previous: IssueState, formData: FormData): Pro
 }
 
 /** Revoking is immediate: `/api/mcp` reads `revoked_at` on every request. */
+// TODO(#24): scope the update to the caller's `owner` once sign-in exists.
 export async function revokeToken(formData: FormData) {
   const raw = formData.get("id");
   const id = typeof raw === "string" && UUID.test(raw.trim()) ? raw.trim() : null;

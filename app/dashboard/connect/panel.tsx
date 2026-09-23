@@ -86,9 +86,16 @@ function buildSnippets(endpoint: string, auth: string | null) {
         : `claude mcp add --transport http cmsy ${endpoint}`,
     },
     {
-      title: "Cursor / VS Code",
-      hint: "Add to .cursor/mcp.json, or .vscode/mcp.json.",
+      title: "Cursor",
+      hint: "Add to .cursor/mcp.json.",
       code: JSON.stringify(config, null, 2),
+    },
+    {
+      // VS Code reads `servers` where Cursor reads `mcpServers`, so the same
+      // payload pasted into .vscode/mcp.json does nothing at all.
+      title: "VS Code",
+      hint: "Add to .vscode/mcp.json.",
+      code: JSON.stringify({ servers: config.mcpServers }, null, 2),
     },
     {
       title: "Any HTTP client",

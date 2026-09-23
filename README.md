@@ -136,6 +136,11 @@ already 256 bits of randomness, a single unsalted SHA-256 is the right hash here
 is no dictionary to defend against, and the digest has to be deterministic to look the
 token up.
 
+> **A public deploy is not safe until sign-in lands (#21).** Issuing a token requires no
+> authentication, so anyone who can load `/dashboard/connect` can mint a credential for
+> `/api/mcp`. Set `MCP_AUTH_TOKEN` on the Worker as well, so the endpoint does not depend
+> on the dashboard alone, and keep the deploy private until #21 is done.
+
 **`MCP_AUTH_TOKEN` (legacy fallback).** A single shared secret, kept working so
 deployments that predate issuance do not break:
 
@@ -148,7 +153,8 @@ The same variable must be set where the app is deployed (e.g.
 `wrangler secret put MCP_AUTH_TOKEN`). It has no owner, no last-used time and cannot be
 revoked without a redeploy — prefer an issued token. Retiring it is tracked in #24.
 
-Either way, register the server with an `Authorization` header:
+Either way, register the server with an `Authorization` header (VS Code reads `servers`
+where Cursor and Claude Code read `mcpServers`):
 
 ```json
 {

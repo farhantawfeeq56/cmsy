@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const steps = [
   { n: "01", title: "CMSy App", text: "Edit content or describe a component in the visual interface." },
   { n: "02", title: "CMSy MCP", text: "Changes become structured instructions agents can understand." },
@@ -46,12 +48,12 @@ export default function Home() {
               Why CMSy
             </a>
           </div>
-          <a
+          <Link
             href="/dashboard"
             className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
           >
             Get started
-          </a>
+          </Link>
         </nav>
       </header>
 
@@ -70,12 +72,12 @@ export default function Home() {
             humans and AI agents work on your app through one shared layer.
           </p>
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <a
+            <Link
               href="/dashboard"
               className="rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Start building
-            </a>
+            </Link>
             <a
               href="#flow"
               className="rounded-lg border border-line bg-card px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-ink/20"
@@ -165,12 +167,12 @@ export default function Home() {
             <h2 className="font-primary mt-5 max-w-xl text-3xl font-normal tracking-[-0.02em] sm:text-5xl">
               Give your agents — and your team — one surface.
             </h2>
-            <a
+            <Link
               href="/dashboard"
               className="mt-8 rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               Get started with CMSy
-            </a>
+            </Link>
           </div>
         </section>
       </main>

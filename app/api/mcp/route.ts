@@ -21,9 +21,9 @@ const handler = createMcpHandler(createCmsyMcpServer, {
 // checked-in `.mcp.json` connects in one step without committing a secret.
 const LOOPBACK = ["localhost", "127.0.0.1", "[::1]", "::1"];
 
-// ponytail: shared-secret bearer token, not Neon Auth JWTs — there is no
-// login flow issuing user tokens yet, and a high-entropy secret over HTTPS is
-// enough to gate a read-only tool. Per-user JWT verification is the follow-up.
+// Shared-secret bearer token, not Neon Auth JWTs — there is no login flow
+// issuing user tokens yet, and a high-entropy secret over HTTPS is enough to
+// gate a read-only tool. Per-user JWT verification is the follow-up (#24).
 const verifier = {
   async verifyAccessToken(token: string): Promise<AuthInfo> {
     const expected = process.env.MCP_AUTH_TOKEN;

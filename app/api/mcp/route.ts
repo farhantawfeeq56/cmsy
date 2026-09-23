@@ -41,46 +41,49 @@ function sameSecret(presented: string, configured: string): boolean {
 /**
  * Two credentials are accepted, in this order:
  *
- *  1. A token issued by /dashboard/connect. Only its SHA-256 is stored, so the
+ *  1. The `MCP_AUTH_TOKEN` shared secret, kept so deployments that predate
+ *     issuance keep working. It has no owner and no audit trail — prefer an
+ *     issued token, and see #24 for retiring it. It is checked first so that a
+ *     secret which happens to start with the issued-token prefix still works,
+ *     and so it never costs a database round trip.
+ *  2. A token issued by /dashboard/connect. Only its SHA-256 is stored, so the
  *     lookup hashes what was presented; the same statement rejects revoked rows
  *     and stamps `last_used_at`, which is what makes the dashboard's "last
  *     used" column and its Revoke button mean anything.
- *  2. The `MCP_AUTH_TOKEN` shared secret, kept so deployments that predate
- *     issuance keep working. It has no owner and no audit trail — prefer an
- *     issued token, and see #24 for retiring it.
+ *
+ * An unset `MCP_AUTH_TOKEN` is a normal configuration now that tokens can be
+ * issued, so a failed match is an ordinary 401 and is not logged.
  *
  * Neon Auth JWTs are deliberately not handled here; that is #24.
  */
 const verifier = {
   async verifyAccessToken(token: string): Promise<AuthInfo> {
+    const shared = process.env.MCP_AUTH_TOKEN;
+    if (shared && sameSecret(token, shared)) {
+      return {
+        token,
+        clientId: "cmsy-agent",
+        scopes: [],
+        expiresAt: expiry(),
+      };
+    }
+
     if (isIssuedToken(token)) {
       const row = await authenticateMcpToken(await hashToken(token));
       // Unknown and revoked are one answer on purpose: a caller must not be
       // able to probe which of its tokens still exist.
-      if (!row) throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
-      return {
-        token,
-        clientId: `cmsy-token:${row.id}`,
-        scopes: [],
-        expiresAt: expiry(),
-        extra: { owner: row.owner, tokenName: row.name },
-      };
+      if (row) {
+        return {
+          token,
+          clientId: `cmsy-token:${row.id}`,
+          scopes: [],
+          expiresAt: expiry(),
+          extra: { owner: row.owner, tokenName: row.name },
+        };
+      }
     }
 
-    const shared = process.env.MCP_AUTH_TOKEN;
-    if (!shared) {
-      console.error("[mcp] refusing non-loopback request: no issued token matched and MCP_AUTH_TOKEN is not set");
-      throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
-    }
-    if (!sameSecret(token, shared)) {
-      throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
-    }
-    return {
-      token,
-      clientId: "cmsy-agent",
-      scopes: [],
-      expiresAt: expiry(),
-    };
+    throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid token");
   },
 };
 

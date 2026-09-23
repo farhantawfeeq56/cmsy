@@ -9,8 +9,12 @@
 /** The one path Streamable HTTP serves every message on. */
 export const MCP_PATH = "/api/mcp";
 
-/** Hosts treated as local dev, where no bearer token is required. */
-export const LOOPBACK = ["localhost", "127.0.0.1", "[::1]", "::1"];
+/**
+ * Hosts treated as local dev, where no bearer token is required. IPv6 appears
+ * bracketed because that is what `URL.hostname` yields, both here and in the
+ * SDK's Origin check that this list is also passed to.
+ */
+export const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
 
 export const isLoopbackHost = (hostname: string) => LOOPBACK.includes(hostname);
 

@@ -123,7 +123,11 @@ Moving an issue means moving its card, not editing the issue.
    - **Label:** one of `feature`, `bug`, `chore`, `refactor`, `docs`, `test`, `improvement`.
    - **Assignee:** your human owner.
    - **Milestone:** if the work belongs to one.
-3. **Check for overlap.** Look at what is `In Progress` on the board. If another issue touches the same files or module, say so in a comment and coordinate (tag the other dev) before starting.
+3. **Check for overlap.** Look at what is `In Progress` on the board, and run the overlap check on the files or folders you expect to touch:
+   ```bash
+   node scripts/pr-overlap.mjs app/dashboard db/index.ts   # exits 1 and lists the PRs if any overlap
+   ```
+   If another issue or open PR touches the same files or module, say so **in a comment on that issue** and tag the other dev before starting. A note in your own PR body is not enough, because they are not reading it. The `PR overlap` workflow repeats the check on every PR, but by then the work is already done.
 4. A new issue lands on the board in **Backlog** automatically. When you start work, set its
    Status to **In Progress** and leave a one-line comment on your plan (`Plan: add endpoint in
    api/auth, unit tests, no schema change`). If a card is somehow missing:

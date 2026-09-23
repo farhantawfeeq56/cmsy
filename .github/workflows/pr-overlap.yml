@@ -1,0 +1,27 @@
+name: PR overlap
+
+# Warns when a PR changes files that another open PR also changes, so the two
+# authors coordinate before the second merge turns into a conflict. It never
+# fails the PR: overlap is a reason to talk, not a defect. The same check runs
+# locally with `node scripts/pr-overlap.mjs` before a branch exists. See #41.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  overlap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare with other open PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Exit 1 means overlap was found and reported; only 2 (could not check)
+        # should fail the job.
+        run: node scripts/pr-overlap.mjs --pr ${{ github.event.pull_request.number }} || [ $? -eq 1 ]

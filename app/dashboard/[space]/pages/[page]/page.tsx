@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getPage, getSpace, listComponents, pageHtml } from "@/db";
+import { parseProps, parseTemplate } from "@/db/component-template";
 import { PageEditor } from "./editor";
 
 /**
@@ -22,7 +23,14 @@ export default async function PageEditorPage(props: PageProps<"/dashboard/[space
     <PageEditor
       space={{ slug: space.slug, name: space.name }}
       page={{ id: page.id, title: page.title, html: pageHtml(page.blocks) }}
-      components={components.map((component) => ({ id: component.id, name: component.name }))}
+      // What each component declares travels with it, so the inspector reads
+      // the declared props rather than guessing them from the name.
+      components={components.map((component) => ({
+        id: component.id,
+        name: component.name,
+        props: parseProps(component.props),
+        template: parseTemplate(component.template),
+      }))}
     />
   );
 }

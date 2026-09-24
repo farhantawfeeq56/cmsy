@@ -36,15 +36,13 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 | Test | `npm test` (Vitest, run once) or `npm run test:watch`. Tests live next to the code as `*.test.ts`, run in Node rather than workerd, and stub the database — never point one at the shared Neon project (rule 11). |
 | Lint / format | `npm run lint` (ESLint 9 + `eslint-config-next`) |
 
-> **`main` is not actually protected, and cannot be on the current plan.**
-> `GET /repos/farhantawfeeq56/cmsy/branches/main` reports `"protected": false`, so §1 rules 1
-> and 4 (no direct pushes, no self-merges) are honour-system only — nothing enforces them.
-> This is not merely un-configured: on a **private** repo owned by a **personal** account on the
-> Free plan the feature is unavailable outright —
-> `GET /repos/farhantawfeeq56/cmsy/rulesets` returns
+> **`main` is protected.** The repo was made public on 2026-09-24, which is what the Free plan
+> required — on a private repo owned by a personal account, `GET /repos/.../rulesets` answers
 > `403 "Upgrade to GitHub Pro or make this repository public to enable this feature."`
-> Closing that gap means going public, buying GitHub Pro, or moving to an organisation.
-> Tracked in #23. Until then, treat those rules as a promise between the two of you.
+> `GET /repos/farhantawfeeq56/cmsy/branches/main` now reports `"protected": true`, with a
+> required pull request and **1 approving review**, and force pushes and deletions refused.
+> Merging is enforced by GitHub; **hard rule 4 still binds the agent** — it never presses the
+> button, approval or not. See #23.
 
 You act **on behalf of your human owner**. They approve anything risky, ambiguous, or irreversible.
 

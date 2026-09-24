@@ -164,6 +164,8 @@ non-zero on the first failure.
 | --- | --- |
 | `list_spaces` | Lists every space — a CMSy project, owning its own pages, components and design system. Read-only. |
 | `list_pages` | Lists one space's pages (id, title, slug, created). Takes the space slug from `list_spaces`. Read-only. |
+| `get_page` | One page's document body as HTML, by space and page slug. Read-only. |
+| `set_page_blocks` | Replaces a page's whole body with HTML, by space and page slug. Refuses markup the editor would strip, so nothing is saved and then silently dropped. Destructive. |
 | `list_components` | Lists one space's components (name, description), and for an imported one, the component and space it came from. Takes the space slug. Read-only. |
 | `get_design_system` | Returns the design system a space uses, with its full `tokens`, and which space owns it when it is shared. Takes the space slug. Read-only. |
 | `get_space` | One space by slug: name, page and component counts, design system name. Read-only. |

@@ -7,6 +7,12 @@ import {
   listImportable,
   listPages,
 } from "@/db";
+import {
+  componentProblems,
+  parseProps,
+  renderComponent,
+  type Prop,
+} from "@/db/component-template";
 import { ago } from "../ago";
 import {
   createComponent,
@@ -14,6 +20,7 @@ import {
   deleteComponent,
   deletePage,
   importComponent,
+  updateComponent,
   useDesignSystem,
 } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
@@ -209,86 +216,103 @@ async function PagesView({ space }: { space: SpaceSummary }) {
   );
 }
 
-/* Visual preview per component, inferred from its name — no stored code yet,
-   so the name is the only signal. Static mock, never interactive. */
-function previewKind(name: string) {
-  const n = name.toLowerCase();
-  if (/(button|cta|action)/.test(n)) return "button";
-  if (/(input|field|form|search|textarea)/.test(n)) return "input";
-  if (/(badge|pill|tag|chip|status)/.test(n)) return "badge";
-  if (/(nav|header|hero|banner|footer|menu)/.test(n)) return "hero";
-  if (/(card|panel|tile|feature|pricing|testimonial)/.test(n)) return "card";
-  return "generic";
+/*
+ * A component renders itself: the template it declares, filled with its own
+ * fallbacks. Nothing here guesses from the name, which is the whole point — a
+ * component with no template yet has nothing to show, and says so.
+ */
+function ComponentPreview({ props, template }: { props: Prop[]; template: string }) {
+  const problems = componentProblems(props, template);
+  const html = renderComponent(props, template);
+
+  if (!html) {
+    return (
+      <p className="max-w-55 text-center text-xs leading-relaxed text-smoke">
+        {problems.length
+          ? problems[0]
+          : template
+            ? "This template declares no props, so it has nothing to draw."
+            : "No template yet. Declare its props and template below to see it here."}
+      </p>
+    );
+  }
+
+  // Safe by construction: renderComponent returns nothing unless the template
+  // passed the page allowlist, and it escapes every value it substitutes.
+  return (
+    <div
+      className="w-full max-w-55"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
 
-function ComponentPreview({ name, description }: { name: string; description: string }) {
-  const kind = previewKind(name);
-  const label = name.length > 18 ? `${name.slice(0, 17).trimEnd()}…` : name;
-  const sub = description.length > 40 ? `${description.slice(0, 39).trimEnd()}…` : description;
+/**
+ * One prop per line, `key | Label | fallback`. Terse, but it is the shape an
+ * agent writes and a person can read back, and it needs no repeatable-row UI.
+ */
+function propsToText(props: Prop[]) {
+  return props.map((prop) => `${prop.key} | ${prop.label} | ${prop.fallback}`).join("\n");
+}
 
-  switch (kind) {
-    case "button":
-      return (
-        <span className="btn pointer-events-none select-none" aria-hidden>
-          {label || "Button"}
-        </span>
-      );
-    case "input":
-      return (
-        <span className="pointer-events-none block w-full max-w-55 select-none" aria-hidden>
-          <span className="input block truncate text-left text-smoke">
-            {sub || "Placeholder…"}
-          </span>
-          <span className="btn mt-2 inline-flex">{label || "Submit"}</span>
-        </span>
-      );
-    case "badge":
-      return (
-        <span className="pointer-events-none flex flex-wrap items-center justify-center gap-2 select-none" aria-hidden>
-          <span className="badge bg-mint">{label || "New"}</span>
-          <span className="badge bg-butter">{label || "Review"}</span>
-          <span className="badge bg-lilac">{label || "Live"}</span>
-        </span>
-      );
-    case "hero":
-      return (
-        <span className="pointer-events-none block w-full max-w-55 select-none" aria-hidden>
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-ember" />
-            <span className="size-1.5 rounded-full bg-butter" />
-            <span className="size-1.5 rounded-full bg-mint" />
-          </span>
-          <span className="font-primary mt-2 block truncate text-base font-medium tracking-tight">
-            {label}
-          </span>
-          <span className="mt-1.5 block h-1.5 w-3/4 rounded-full bg-ink/10" />
-          <span className="mt-1.5 block h-1.5 w-1/2 rounded-full bg-ink/10" />
-          <span className="btn mt-2.5 inline-flex text-xs">Get started</span>
-        </span>
-      );
-    case "card":
-      return (
-        <span className="pointer-events-none block w-full max-w-55 rounded-lg border border-line bg-white p-3 text-left select-none" aria-hidden>
-          <span className="block h-10 rounded-md bg-mint" />
-          <span className="font-primary mt-2 block truncate text-sm font-medium">{label}</span>
-          <span className="mt-1.5 block h-1.5 w-full rounded-full bg-ink/10" />
-          <span className="mt-1.5 block h-1.5 w-2/3 rounded-full bg-ink/10" />
-        </span>
-      );
-    default:
-      return (
-        <span className="pointer-events-none flex w-full max-w-55 items-center gap-3 select-none" aria-hidden>
-          <span className="font-primary flex size-10 shrink-0 items-center justify-center rounded-lg bg-lilac text-sm font-semibold">
-            {label.trim().charAt(0).toUpperCase() || "?"}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{label}</span>
-            <span className="mt-1.5 block h-1.5 w-full rounded-full bg-ink/10" />
-            <span className="mt-1.5 block h-1.5 w-2/3 rounded-full bg-ink/10" />
-          </span>
-        </span>
-      );
-  }
+/**
+ * Corrects what a component declares, in place. Folded away because a component
+ * is written once and read often, and the preview above it is the point.
+ */
+function ComponentEditor({
+  spaceId,
+  id,
+  props,
+  template,
+}: {
+  spaceId: string;
+  id: string;
+  props: Prop[];
+  template: string;
+}) {
+  const problems = componentProblems(props, template);
+
+  return (
+    <details className="border-t border-line pt-2">
+      <summary className={`label px-1 py-1 ${SUMMARY}`}>
+        {props.length ? `${props.length} props` : "No props declared"}
+        {problems.length ? " · cannot render" : ""}
+      </summary>
+
+      {problems.length > 0 && (
+        <ul className="mt-2 space-y-1 rounded-lg border border-line bg-butter px-3 py-2">
+          {problems.map((problem) => (
+            <li key={problem} className="text-xs leading-relaxed">
+              {problem}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form action={updateComponent} className="mt-2 grid gap-2">
+        <input type="hidden" name="spaceId" value={spaceId} />
+        <input type="hidden" name="id" value={id} />
+        <textarea
+          name="props"
+          rows={3}
+          defaultValue={propsToText(props)}
+          aria-label="Declared props"
+          className="input font-mono text-xs"
+        />
+        <textarea
+          name="template"
+          rows={3}
+          defaultValue={template}
+          placeholder={"<h2>{{heading}}</h2>"}
+          aria-label="Component template"
+          className="input font-mono text-xs"
+        />
+        <button type="submit" className="btn-quiet justify-center rounded-md">
+          Save props and template
+        </button>
+      </form>
+    </details>
+  );
 }
 
 /** Renders DESIGN.md prose: bullets and paragraphs, with bold/code inline. */
@@ -503,7 +527,7 @@ async function ComponentsSection({ spaceId }: { spaceId: string }) {
         Reusable UI built to the design system above.
       </p>
 
-      <form action={createComponent} className="mt-4 flex flex-col gap-3 sm:flex-row">
+      <form action={createComponent} className="mt-4 grid gap-3 sm:grid-cols-2">
         <input type="hidden" name="spaceId" value={spaceId} />
         <input
           name="name"
@@ -511,7 +535,7 @@ async function ComponentsSection({ spaceId }: { spaceId: string }) {
           maxLength={80}
           placeholder="Component name"
           aria-label="Component name"
-          className="input sm:max-w-[12rem]"
+          className="input"
         />
         <input
           name="description"
@@ -520,7 +544,23 @@ async function ComponentsSection({ spaceId }: { spaceId: string }) {
           aria-label="Component description"
           className="input"
         />
-        <button type="submit" className="btn shrink-0 justify-center">
+        {/* One prop per line, `key | Label | default`, which is the shape an
+            agent can write and a person can read back. */}
+        <textarea
+          name="props"
+          rows={3}
+          placeholder={"Props, one per line — heading | Heading | Build faster"}
+          aria-label="Declared props"
+          className="input font-mono text-xs"
+        />
+        <textarea
+          name="template"
+          rows={3}
+          placeholder={"Template — <h2>{{heading}}</h2><p>{{body}}</p>"}
+          aria-label="Component template"
+          className="input font-mono text-xs"
+        />
+        <button type="submit" className="btn justify-center sm:col-span-2">
           Create component
         </button>
       </form>
@@ -536,9 +576,12 @@ async function ComponentsSection({ spaceId }: { spaceId: string }) {
               key={component.id}
               className="flex flex-col overflow-hidden rounded-xl border border-line bg-card"
             >
-              {/* Preview first — every component reads visually, not just by name. */}
-              <div className="flex h-36 items-center justify-center border-b border-line bg-paper p-4">
-                <ComponentPreview name={component.name} description={component.description} />
+              {/* Preview first — the component's own template, not a mock. */}
+              <div className="flex min-h-36 items-center justify-center border-b border-line bg-paper p-4">
+                <ComponentPreview
+                  props={parseProps(component.props)}
+                  template={component.template}
+                />
               </div>
               <div className="flex flex-1 flex-col gap-2 p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -556,6 +599,16 @@ async function ComponentsSection({ spaceId }: { spaceId: string }) {
                 {component.description && (
                   <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
                 )}
+
+                {/* What the component declares, in the same line-per-prop shape
+                    the create form takes, so it can be corrected in place. */}
+                <ComponentEditor
+                  spaceId={spaceId}
+                  id={component.id}
+                  props={parseProps(component.props)}
+                  template={component.template}
+                />
+
                 <p className="mt-auto pt-1">
                   {component.origin_space_name ? (
                     <span className="badge">

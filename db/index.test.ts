@@ -96,6 +96,33 @@ describe("pageHtml", () => {
   });
 });
 
+describe("setPageHtml", () => {
+  it("binds the body and the page id rather than splicing either into the SQL", async () => {
+    nextRows = [{ id: "p1" }];
+    const { setPageHtml, LIMITS } = await load();
+    const hostile = "</p><script>drop table pages</script>";
+
+    expect(await setPageHtml("p1", hostile)).toBe(true);
+    expect(calls[0].values).toEqual([JSON.stringify({ html: hostile }), "p1"]);
+    expect(calls[0].sql).not.toContain(hostile);
+    expect(LIMITS.pageBody).toBe(200_000);
+  });
+
+  it("caps the stored body at the shared limit, for every caller", async () => {
+    nextRows = [{ id: "p1" }];
+    const { setPageHtml, LIMITS } = await load();
+
+    await setPageHtml("p1", "x".repeat(LIMITS.pageBody + 50));
+    const stored = JSON.parse(calls[0].values[0] as string) as { html: string };
+    expect(stored.html).toHaveLength(LIMITS.pageBody);
+  });
+
+  it("reports a page that is not there instead of claiming a save", async () => {
+    const { setPageHtml } = await load();
+    expect(await setPageHtml("missing", "<p>x</p>")).toBe(false);
+  });
+});
+
 describe("slugify", () => {
   it("lowercases, hyphenates and trims the ends", async () => {
     const { slugify } = await load();

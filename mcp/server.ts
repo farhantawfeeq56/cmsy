@@ -3,7 +3,21 @@ import { z } from "zod";
 // Relative, not `@/db`: this module is deliberately framework-free so a stdio
 // entry point can import it from a plain Node process, where the `@/*` alias
 // that Next's bundler resolves is not available.
-import { getDesignSystem, getSpace, listComponents, listPages, listSpaces } from "../db";
+import {
+  createComponent,
+  createSpace,
+  deleteComponent,
+  findComponent,
+  getDesignSystem,
+  getSpace,
+  importComponent,
+  LIMITS,
+  listComponents,
+  listImportable,
+  listPages,
+  listRecentActivity,
+  listSpaces,
+} from "../db";
 
 export const SERVER_INFO = {
   name: "cmsy",
@@ -97,16 +111,12 @@ const spaceRef = z.object({ name: z.string(), slug: z.string() });
  * An unknown slug is the agent's mistake, not a server fault, so it comes back
  * as a tool error the model can read and correct rather than a protocol error.
  */
+function toolError(text: string) {
+  return { content: [{ type: "text" as const, text }], isError: true };
+}
+
 function spaceNotFound(slug: string) {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: `No space with slug "${slug}". Call list_spaces to see the slugs that exist.`,
-      },
-    ],
-    isError: true,
-  };
+  return toolError(`No space with slug "${slug}". Call list_spaces to see the slugs that exist.`);
 }
 
 const listPagesOutput = z.object({
@@ -324,6 +334,311 @@ function registerGetDesignSystem(server: McpServer) {
   );
 }
 
+const getSpaceOutput = z.object({
+  name: z.string(),
+  slug: z.string(),
+  pages: z.number().int(),
+  components: z.number().int(),
+  designSystem: z.string().nullable(),
+  dashboardPath: z.string(),
+});
+
+function registerGetSpace(server: McpServer) {
+  server.registerTool(
+    "get_space",
+    {
+      title: "Get space",
+      description:
+        "Read one space by slug: its name, how many pages and components it has, " +
+        "and the name of the design system it uses.",
+      inputSchema: spaceInput,
+      outputSchema: getSpaceOutput,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ space: slug }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const structured = {
+        name: space.name,
+        slug: space.slug,
+        pages: space.page_count,
+        components: space.component_count,
+        designSystem: space.design_system_name,
+        dashboardPath: `/dashboard/${space.slug}`,
+      };
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `${structured.name} (${structured.slug}) — ${structured.pages} pages, ` +
+              `${structured.components} components, design system: ${structured.designSystem ?? "none"}`,
+          },
+        ],
+        structuredContent: structured,
+      };
+    },
+  );
+}
+
+const createSpaceOutput = z.object({
+  name: z.string(),
+  slug: z.string(),
+  dashboardPath: z.string(),
+});
+
+function registerCreateSpace(server: McpServer) {
+  server.registerTool(
+    "create_space",
+    {
+      title: "Create space",
+      description:
+        "Create a new space, with its own design system selected. The slug is " +
+        "derived from the name and gets a numeric suffix if it is taken, so use " +
+        "the slug this returns rather than guessing it.",
+      inputSchema: z.object({
+        name: z.string().trim().min(1).max(LIMITS.spaceName).describe("Display name for the space."),
+      }),
+      outputSchema: createSpaceOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ name }) => {
+      const row = await createSpace(name);
+      if (!row) return toolError(`Could not find a free slug for "${name}". Try a different name.`);
+
+      const structured = { name, slug: row.slug, dashboardPath: `/dashboard/${row.slug}` };
+      return {
+        content: [{ type: "text" as const, text: `Created space ${name} (${row.slug}).` }],
+        structuredContent: structured,
+      };
+    },
+  );
+}
+
+const componentResult = z.object({
+  space: spaceRef,
+  component: z.object({ id: z.string(), name: z.string() }),
+});
+
+function registerCreateComponent(server: McpServer) {
+  server.registerTool(
+    "create_component",
+    {
+      title: "Create component",
+      description:
+        "Add a component to a space. Names are unique within a space; if the " +
+        "name is taken, nothing is changed and the call returns an error.",
+      inputSchema: spaceInput.extend({
+        name: z.string().trim().min(1).max(LIMITS.componentName).describe("Component name, e.g. PricingCard."),
+        description: z
+          .string()
+          .trim()
+          .max(LIMITS.componentDescription)
+          .default("")
+          .describe("One line on what the component is for."),
+      }),
+      outputSchema: componentResult,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ space: slug, name, description }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const row = await createComponent(space.id, name, description);
+      if (!row) return toolError(`${space.name} already has a component named "${name}".`);
+
+      return {
+        content: [{ type: "text" as const, text: `Created ${name} in ${space.name}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          component: { id: row.id, name },
+        },
+      };
+    },
+  );
+}
+
+function registerDeleteComponent(server: McpServer) {
+  server.registerTool(
+    "delete_component",
+    {
+      title: "Delete component",
+      description:
+        "Delete a component from a space, by name. This cannot be undone. Copies " +
+        "other spaces imported from it are kept, but lose their link to it.",
+      inputSchema: spaceInput.extend({
+        component: z.string().min(1).describe("The component's name, as returned by list_components."),
+      }),
+      outputSchema: componentResult,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, component: name }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const found = await findComponent(space.id, name);
+      if (!found || !(await deleteComponent(space.id, found.id))) {
+        return toolError(`${space.name} has no component named "${name}". Call list_components to see them.`);
+      }
+
+      return {
+        content: [{ type: "text" as const, text: `Deleted ${found.name} from ${space.name}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          component: found,
+        },
+      };
+    },
+  );
+}
+
+const listImportableOutput = z.object({
+  space: spaceRef,
+  count: z.number().int(),
+  components: z.array(
+    z.object({ id: z.string(), name: z.string(), fromSpace: spaceRef }),
+  ),
+});
+
+function registerListImportable(server: McpServer) {
+  server.registerTool(
+    "list_importable",
+    {
+      title: "List importable components",
+      description:
+        "List components in other spaces that this space has not imported yet, " +
+        "with the space each one lives in. Pass one to import_component.",
+      inputSchema: spaceInput,
+      outputSchema: listImportableOutput,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ space: slug }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const rows = await listImportable(space.id);
+      const structured = {
+        space: { name: space.name, slug: space.slug },
+        count: rows.length,
+        components: rows.map((c) => ({
+          id: c.id,
+          name: c.name,
+          fromSpace: { name: c.space_name, slug: c.space_slug },
+        })),
+      };
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: structured.count
+              ? structured.components.map((c) => `${c.name} (from ${c.fromSpace.slug})`).join("\n")
+              : `Nothing left to import into ${space.name}.`,
+          },
+        ],
+        structuredContent: structured,
+      };
+    },
+  );
+}
+
+function registerImportComponent(server: McpServer) {
+  server.registerTool(
+    "import_component",
+    {
+      title: "Import component",
+      description:
+        "Copy a component from another space into this one. The copy keeps a " +
+        "link to its original, which list_components reports as importedFrom. " +
+        "Fails if this space already has a component with the same name.",
+      inputSchema: spaceInput.extend({
+        fromSpace: z.string().min(1).describe("Slug of the space the component lives in now."),
+        component: z.string().min(1).describe("The component's name in that space."),
+      }),
+      outputSchema: componentResult,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ space: slug, fromSpace: fromSlug, component: name }) => {
+      if (slug === fromSlug) return toolError("A component cannot be imported into the space it is in.");
+
+      const [space, from] = await Promise.all([getSpace(slug), getSpace(fromSlug)]);
+      if (!space) return spaceNotFound(slug);
+      if (!from) return spaceNotFound(fromSlug);
+
+      const source = await findComponent(from.id, name);
+      if (!source) {
+        return toolError(`${from.name} has no component named "${name}". Call list_importable to see candidates.`);
+      }
+
+      const row = await importComponent(space.id, source.id);
+      if (!row) return toolError(`${space.name} already has a component named "${source.name}".`);
+
+      return {
+        content: [{ type: "text" as const, text: `Imported ${row.name} from ${from.name} into ${space.name}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          component: row,
+        },
+      };
+    },
+  );
+}
+
+const listRecentActivityOutput = z.object({
+  count: z.number().int(),
+  items: z.array(
+    z.object({
+      kind: z.enum(["page", "component"]),
+      title: z.string(),
+      createdAt: z.string(),
+      space: spaceRef,
+    }),
+  ),
+});
+
+function registerListRecentActivity(server: McpServer) {
+  server.registerTool(
+    "list_recent_activity",
+    {
+      title: "List recent activity",
+      description:
+        "The newest pages and components across every space, newest first — " +
+        "the dashboard's activity list.",
+      inputSchema: z.object({
+        limit: z.number().int().min(1).max(50).default(5).describe("How many items, 1–50."),
+      }),
+      outputSchema: listRecentActivityOutput,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ limit }) => {
+      const rows = await listRecentActivity(limit);
+      const structured = {
+        count: rows.length,
+        items: rows.map((item) => ({
+          kind: item.kind,
+          title: item.title,
+          createdAt: new Date(item.created_at).toISOString(),
+          space: { name: item.space_name, slug: item.space_slug },
+        })),
+      };
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: structured.count
+              ? structured.items.map((i) => `${i.kind} ${i.title} in ${i.space.slug} — ${i.createdAt}`).join("\n")
+              : "No activity yet.",
+          },
+        ],
+        structuredContent: structured,
+      };
+    },
+  );
+}
+
 /**
  * Built per request: `createMcpHandler` calls this factory for every exchange,
  * so the server instance must not be shared or cached across requests.
@@ -334,5 +649,12 @@ export function createCmsyMcpServer(): McpServer {
   registerListPages(server);
   registerListComponents(server);
   registerGetDesignSystem(server);
+  registerGetSpace(server);
+  registerCreateSpace(server);
+  registerCreateComponent(server);
+  registerDeleteComponent(server);
+  registerListImportable(server);
+  registerImportComponent(server);
+  registerListRecentActivity(server);
   return server;
 }

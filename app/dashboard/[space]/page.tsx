@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   getSpace,
   listComponents,
@@ -21,18 +21,23 @@ import design from "./design.generated.json";
 
 /**
  * Two levels, not three equal tabs: Pages are the content this space is for,
- * Design is the visual system behind it. `?tab=` is the old three-tab scheme,
- * still honoured so existing links keep working.
+ * Design is the visual system behind it.
  */
 const VIEWS = ["pages", "design"] as const;
 type View = (typeof VIEWS)[number];
 
 const LABEL: Record<View, string> = { pages: "Pages", design: "Design" };
 
-const viewOf = (value: string | string[] | undefined): View => {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === "components" || raw === "design") return "design";
-  return "pages";
+/**
+ * `?tab=` is the old three-tab scheme. Its links still work, but they are
+ * redirected to the canonical URL so a Components link lands on Components
+ * rather than at the top of a page whose first section is the design system.
+ */
+const legacyTarget = (slug: string, tab: string | string[] | undefined) => {
+  const raw = Array.isArray(tab) ? tab[0] : tab;
+  if (raw === "components") return `/dashboard/${slug}?view=design#components`;
+  if (raw === "design") return `/dashboard/${slug}?view=design`;
+  return raw ? `/dashboard/${slug}` : null;
 };
 
 /** Shared by the New Page popover and the row menus. */
@@ -43,7 +48,11 @@ const SUMMARY = "cursor-pointer list-none [&::-webkit-details-marker]:hidden";
 export default async function SpacePage(props: PageProps<"/dashboard/[space]">) {
   const { space: slug } = await props.params;
   const query = await props.searchParams;
-  const view = viewOf(query.view ?? query.tab);
+
+  const legacy = legacyTarget(slug, query.tab);
+  if (legacy) redirect(legacy);
+
+  const view: View = query.view === "design" ? "design" : "pages";
 
   const space = await getSpace(slug);
   if (!space) notFound();
@@ -358,16 +367,14 @@ async function DesignSystemSection({
 
       <div className="card mt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
+          {/* The card describes DESIGN.md, because that is what is rendered
+              below it. The space's own selection lives in the picker instead
+              of in this heading, where it used to contradict the contents. */}
           <div>
-            <h3 className="font-primary text-lg font-medium tracking-tight">
-              {current?.name ?? "No design system"}
-            </h3>
+            <h3 className="font-primary text-lg font-medium tracking-tight">DESIGN.md</h3>
             <p className="mt-1 text-xs text-smoke">
-              {current
-                ? current.space_id === spaceId
-                  ? `Owned by this space · ${current.token_count} tokens`
-                  : `Imported from ${current.space_name} · ${current.token_count} tokens`
-                : "Pick one below to give this space a design system."}
+              {design.colors.length} colours · {design.typography.length} type steps ·{" "}
+              {design.rounded.length} radii · the same rules for every space
             </p>
           </div>
 
@@ -378,7 +385,7 @@ async function DesignSystemSection({
               <form action={useDesignSystem} className={`${POPOVER} mt-2 w-72 max-w-[80vw] p-3`}>
                 <input type="hidden" name="spaceId" value={spaceId} />
                 <fieldset className="grid gap-1">
-                  <legend className="label mb-1 px-1">Use another space&apos;s system</legend>
+                  <legend className="label mb-1 px-1">Which system this space points at</legend>
                   {systems.map((system) => (
                     <label
                       key={system.id}
@@ -407,6 +414,12 @@ async function DesignSystemSection({
                 <button type="submit" className="btn mt-2 w-full justify-center">
                   Use selected system
                 </button>
+                {/* TODO(#48): retire this picker once one global system is
+                    decided; nothing below reads the selected row. */}
+                <p className="mt-2 px-1 text-xs leading-relaxed text-smoke">
+                  The colours, type and guidelines above come from DESIGN.md
+                  either way.
+                </p>
               </form>
             </details>
           )}
@@ -479,7 +492,7 @@ async function ComponentsSection({ spaceId }: { spaceId: string }) {
   ]);
 
   return (
-    <div>
+    <div id="components" className="scroll-mt-6">
       <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Components</h2>
       <p className="mt-1 text-sm text-smoke">
         Reusable UI built to the design system above.

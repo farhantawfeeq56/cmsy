@@ -73,7 +73,7 @@ Design / Edit → Structured instruction → Agent → Codebase
 
 ## Design system
 
-A space's visual rules live in [`DESIGN.md`](./DESIGN.md) — colours, type scale, radii and the
+CMSy's visual rules live in [`DESIGN.md`](./DESIGN.md) — colours, type scale, radii and the
 guidelines prose. The Design area of a space renders that file, so editing DESIGN.md *is* how
 you change the design system; there is nothing to keep in sync by hand.
 

@@ -116,7 +116,7 @@ export default async function DashboardPage() {
                   href={
                     item.kind === "page"
                       ? `/dashboard/${item.space_slug}`
-                      : `/dashboard/${item.space_slug}?view=design`
+                      : `/dashboard/${item.space_slug}?view=design#components`
                   }
                   className="flex items-center gap-4 py-3.5"
                 >

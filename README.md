@@ -227,6 +227,17 @@ Tokens are not yet per-user in any real sense: CMSy has no sign-in flow, so ever
 belongs to whoever can open the dashboard. The `owner` column exists for when #24 starts
 writing the Neon Auth subject into it.
 
+## Testing
+
+```bash
+npm test            # Vitest, once
+npm run test:watch  # re-run on save
+```
+
+Tests sit next to the code they cover as `*.test.ts`. They run in Node, not in the Workers
+runtime, and stub `@neondatabase/serverless`, so they need no `DATABASE_URL`. Keep it that way:
+`.env.local` may point at the database the deployed Worker reads.
+
 ## Why CMSy?
 
 Traditional CMSs generally separate content from the application's codebase.

@@ -27,6 +27,8 @@
     "build:next": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "predev:vinext": "npm run design:sync",
     "dev:vinext": "vinext dev --port 3001",
     "prebuild:vinext": "npm run design:sync",
@@ -43,9 +45,9 @@
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^4.6.5",
     "react-server-dom-webpack": "^19.2.6",
-    "vinext": "^1.0.0-beta.10"
+    "vinext": "^1.0.0-beta.10",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.56.0",
@@ -59,7 +61,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "type": "module"
 }

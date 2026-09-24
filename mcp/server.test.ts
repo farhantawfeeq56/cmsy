@@ -23,6 +23,7 @@ vi.mock("../db", () => ({
   pageHtml: (blocks: { html?: unknown } | null) =>
     typeof blocks?.html === "string" ? blocks.html : "",
   setPageHtml: vi.fn(),
+  updateComponent: vi.fn(),
 }));
 
 const db = await import("../db");
@@ -71,7 +72,7 @@ describe("tools/list", () => {
     for (const read of ["get_space", "get_page", "list_importable", "list_recent_activity"]) {
       expect(hints[read].readOnlyHint).toBe(true);
     }
-    for (const write of ["create_space", "create_component", "import_component"]) {
+    for (const write of ["create_space", "create_component", "update_component", "import_component"]) {
       expect(hints[write]).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
     for (const destructive of ["delete_component", "set_page_blocks"]) {
@@ -112,7 +113,126 @@ describe("create_component", () => {
   it("defaults the description to empty", async () => {
     vi.mocked(db.createComponent).mockResolvedValue({ id: "c-new" });
     await call("create_component", { space: "docs", name: "Hero" });
-    expect(db.createComponent).toHaveBeenCalledWith("s-docs", "Hero", "");
+    expect(db.createComponent).toHaveBeenCalledWith("s-docs", "Hero", "", [], "");
+  });
+
+  it("stores the props and template it was given", async () => {
+    vi.mocked(db.createComponent).mockResolvedValue({ id: "c-new" });
+    const props = [{ key: "heading", label: "Heading", fallback: "Hi" }];
+    const result = await call("create_component", {
+      space: "docs",
+      name: "Hero",
+      props,
+      template: "<h2>{{heading}}</h2>",
+    });
+    expect(db.createComponent).toHaveBeenCalledWith("s-docs", "Hero", "", props, "<h2>{{heading}}</h2>");
+    expect(result.structuredContent).toMatchObject({ declared: { props, template: "<h2>{{heading}}</h2>" } });
+  });
+
+  it("refuses a template the editor would strip rather than saving it", async () => {
+    const result = await call("create_component", {
+      space: "docs",
+      name: "Hero",
+      props: [{ key: "heading" }],
+      template: '<h2 class="title">{{heading}}</h2>',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/class is not kept on <h2>/);
+    expect(db.createComponent).not.toHaveBeenCalled();
+  });
+
+  it("refuses a template that names a prop it did not declare", async () => {
+    const result = await call("create_component", {
+      space: "docs",
+      name: "Hero",
+      template: "<h2>{{heading}}</h2>",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/\{\{heading\}\} does not match any declared prop/);
+  });
+
+  it("refuses a prop the parser would drop instead of reporting success", async () => {
+    const result = await call("create_component", {
+      space: "docs",
+      name: "Hero",
+      props: [{ key: "not a key" }],
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/would be dropped/);
+    expect(db.createComponent).not.toHaveBeenCalled();
+  });
+});
+
+describe("update_component", () => {
+  it("is a tool error for an unknown space, with no lookup", async () => {
+    const result = await call("update_component", { space: "nope", component: "Hero" });
+    expect(result.isError).toBe(true);
+    expect(db.findComponent).not.toHaveBeenCalled();
+  });
+
+  it("asks for something to write when neither field is sent", async () => {
+    const result = await call("update_component", { space: "docs", component: "Hero" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/nothing to update/);
+    expect(db.updateComponent).not.toHaveBeenCalled();
+  });
+
+  it("says so when the component is not in that space", async () => {
+    vi.mocked(db.findComponent).mockResolvedValue(null);
+    const result = await call("update_component", { space: "docs", component: "Ghost", template: "<p>Hi</p>" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/no component named "Ghost"/);
+    expect(db.updateComponent).not.toHaveBeenCalled();
+  });
+
+  it("writes only the template, leaving the stored props alone", async () => {
+    vi.mocked(db.findComponent).mockResolvedValue({
+      id: "c1",
+      name: "Hero",
+      props: [{ key: "heading", label: "Heading", fallback: "Hi" }],
+      template: "<h2>{{heading}}</h2>",
+    });
+    vi.mocked(db.updateComponent).mockResolvedValue(true);
+
+    const result = await call("update_component", {
+      space: "docs",
+      component: "Hero",
+      template: "<h3>{{heading}}</h3>",
+    });
+
+    // `null` is what leaves the column as it is, so the props cannot be wiped.
+    expect(db.updateComponent).toHaveBeenCalledWith("s-docs", "c1", null, "<h3>{{heading}}</h3>");
+    expect(result.structuredContent).toMatchObject({
+      declared: { props: [{ key: "heading", label: "Heading", fallback: "Hi" }], template: "<h3>{{heading}}</h3>" },
+    });
+  });
+
+  it("judges a template sent alone against the props already stored", async () => {
+    vi.mocked(db.findComponent).mockResolvedValue({
+      id: "c1",
+      name: "Hero",
+      props: [{ key: "heading", label: "Heading", fallback: "Hi" }],
+      template: "<h2>{{heading}}</h2>",
+    });
+    const result = await call("update_component", {
+      space: "docs",
+      component: "Hero",
+      template: "<h2>{{subhead}}</h2>",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/\{\{subhead\}\} does not match any declared prop/);
+    expect(db.updateComponent).not.toHaveBeenCalled();
+  });
+
+  it("replaces the props when they are sent, and reports them back", async () => {
+    vi.mocked(db.findComponent).mockResolvedValue({ id: "c1", name: "Hero", props: [], template: "" });
+    vi.mocked(db.updateComponent).mockResolvedValue(true);
+    const props = [{ key: "heading", label: "", fallback: "" }];
+
+    const result = await call("update_component", { space: "docs", component: "Hero", props });
+
+    expect(db.updateComponent).toHaveBeenCalledWith("s-docs", "c1", [{ key: "heading", label: "heading", fallback: "" }], null);
+    expect(result.structuredContent).toMatchObject({ declared: { props: [{ key: "heading", label: "heading", fallback: "" }] } });
   });
 });
 
@@ -125,7 +245,7 @@ describe("delete_component", () => {
   });
 
   it("deletes by the id the name resolves to, scoped to the space", async () => {
-    vi.mocked(db.findComponent).mockResolvedValue({ id: "c1", name: "Sidebar" });
+    vi.mocked(db.findComponent).mockResolvedValue({ id: "c1", name: "Sidebar", props: [], template: "" });
     vi.mocked(db.deleteComponent).mockResolvedValue(true);
     const result = await call("delete_component", { space: "docs", component: "Sidebar" });
     expect(result.isError).toBeFalsy();
@@ -141,7 +261,7 @@ describe("import_component", () => {
   });
 
   it("copies the source component's id into the target space", async () => {
-    vi.mocked(db.findComponent).mockResolvedValue({ id: "c-hero", name: "Hero" });
+    vi.mocked(db.findComponent).mockResolvedValue({ id: "c-hero", name: "Hero", props: [], template: "" });
     vi.mocked(db.importComponent).mockResolvedValue({ id: "c-copy", name: "Hero" });
     const result = await call("import_component", { space: "docs", fromSpace: "marketing-site", component: "Hero" });
     expect(db.findComponent).toHaveBeenCalledWith("s-site", "Hero");
@@ -150,7 +270,7 @@ describe("import_component", () => {
   });
 
   it("is a tool error when the target already has that name", async () => {
-    vi.mocked(db.findComponent).mockResolvedValue({ id: "c-hero", name: "Hero" });
+    vi.mocked(db.findComponent).mockResolvedValue({ id: "c-hero", name: "Hero", props: [], template: "" });
     vi.mocked(db.importComponent).mockResolvedValue(null);
     const result = await call("import_component", { space: "docs", fromSpace: "marketing-site", component: "Hero" });
     expect(result.isError).toBe(true);

@@ -179,4 +179,34 @@ describe("component writes", () => {
     nextRows = [{ id: "c1" }];
     expect(await deleteComponent("s1", "c1")).toBe(true);
   });
+
+  it("replaces both columns when both are given", async () => {
+    const { updateComponent } = await load();
+    const props = [{ key: "heading", label: "Heading", fallback: "Hi" }];
+    await updateComponent("s1", "c1", props, "<h2>{{heading}}</h2>");
+
+    expect(calls[0].sql).toMatch(/coalesce\(\$\?::jsonb, props\)/);
+    expect(calls[0].values).toEqual([JSON.stringify(props), "<h2>{{heading}}</h2>", "c1", "s1"]);
+  });
+
+  it("binds null for a column the caller left alone, so it cannot be wiped", async () => {
+    const { updateComponent } = await load();
+    await updateComponent("s1", "c1", null, "<h2>Hi</h2>");
+
+    expect(calls[0].values).toEqual([null, "<h2>Hi</h2>", "c1", "s1"]);
+  });
+
+  it("clears a column when the caller sends an empty value, not null", async () => {
+    const { updateComponent } = await load();
+    await updateComponent("s1", "c1", [], "");
+
+    expect(calls[0].values).toEqual(["[]", "", "c1", "s1"]);
+  });
+
+  it("reads a component's declared props back with its name", async () => {
+    const { findComponent } = await load();
+    nextRows = [{ id: "c1", name: "Hero", props: [], template: "<h2>Hi</h2>" }];
+    expect(await findComponent("s1", "Hero")).toMatchObject({ template: "<h2>Hi</h2>" });
+    expect(calls[0].sql).toMatch(/select id, name, props, template from components/);
+  });
 });

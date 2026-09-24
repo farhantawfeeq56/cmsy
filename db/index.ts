@@ -262,16 +262,22 @@ export async function createComponent(
  * Replaces what a component declares. Only the props and the template — the
  * name is what other rows and pages already refer to, so it stays put. False
  * when no such component exists in that space.
+ *
+ * `null` leaves that column as it is, which is what a writer needs when it only
+ * has one of the two: an agent over MCP can set a template without re-sending
+ * props it has no way to read back. The dashboard always sends both, so it
+ * still replaces the pair.
  */
 export async function updateComponent(
   spaceId: string,
   id: string,
-  props: Prop[],
-  template: string,
+  props: Prop[] | null,
+  template: string | null,
 ) {
   const found = await rows<{ id: string }>(db()`
     update components
-    set props = ${JSON.stringify(props)}::jsonb, template = ${template}
+    set props = coalesce(${props === null ? null : JSON.stringify(props)}::jsonb, props),
+        template = coalesce(${template}, template)
     where id = ${id} and space_id = ${spaceId}
     returning id`);
   return found.length > 0;
@@ -303,13 +309,26 @@ export async function deleteComponent(spaceId: string, id: string) {
   return deleted.length > 0;
 }
 
+/**
+ * A component resolved by name. The declared props and template come along
+ * because a caller about to replace one of them has to judge the result against
+ * the other, and `props` is raw jsonb until `parseProps` has seen it.
+ */
+export type ComponentLookup = {
+  id: string;
+  name: string;
+  props: unknown;
+  template: string;
+};
+
 /** Component names are unique per space, so a name identifies one. */
 export async function findComponent(
   spaceId: string,
   name: string,
-): Promise<{ id: string; name: string } | null> {
-  const [row] = await rows<{ id: string; name: string }>(db()`
-    select id, name from components where space_id = ${spaceId} and name = ${name}`);
+): Promise<ComponentLookup | null> {
+  const [row] = await rows<ComponentLookup>(db()`
+    select id, name, props, template from components
+    where space_id = ${spaceId} and name = ${name}`);
   return row ?? null;
 }
 

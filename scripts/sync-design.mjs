@@ -79,7 +79,12 @@ function parseDesign(source) {
   };
 }
 
-const design = parseDesign(readFileSync(new URL("DESIGN.md", root), "utf8"));
+const design = parseDesign(
+  // Normalised so the artifact is byte-identical on Windows and Linux: the
+  // prose is embedded in the JSON, and a checkout with CRLF would otherwise
+  // commit different bytes than CI generates.
+  readFileSync(new URL("DESIGN.md", root), "utf8").replace(/\r\n/g, "\n"),
+);
 
 // Fail the build rather than shipping an empty design system view.
 assert.ok(design.colors.length > 0, "DESIGN.md has no colors in its frontmatter");

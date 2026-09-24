@@ -9,6 +9,7 @@ import {
   deleteComponent,
   findComponent,
   getDesignSystem,
+  getPage,
   getSpace,
   importComponent,
   LIMITS,
@@ -17,7 +18,12 @@ import {
   listPages,
   listRecentActivity,
   listSpaces,
+  pageHtml,
+  setPageHtml,
 } from "../db";
+// The leaf module, not `../db`: it is pure and import-free, so a test that
+// replaces the database functions still exercises the real checker.
+import { pageHtmlProblems } from "../db/page-html";
 
 export const SERVER_INFO = {
   name: "cmsy",
@@ -117,6 +123,12 @@ function toolError(text: string) {
 
 function spaceNotFound(slug: string) {
   return toolError(`No space with slug "${slug}". Call list_spaces to see the slugs that exist.`);
+}
+
+function pageNotFound(slug: string, spaceName: string) {
+  return toolError(
+    `No page with slug "${slug}" in ${spaceName}. Call list_pages to see the slugs that exist.`,
+  );
 }
 
 const listPagesOutput = z.object({
@@ -640,6 +652,112 @@ function registerListRecentActivity(server: McpServer) {
 }
 
 /**
+ * A page is addressed the way an agent already has it: the space slug from
+ * `list_spaces`, the page slug from `list_pages`.
+ */
+const pageInput = spaceInput.extend({
+  page: z.string().min(1).describe("The page's slug, as returned by list_pages."),
+});
+
+const pageRef = z.object({ id: z.string(), title: z.string(), slug: z.string() });
+
+const pageBodyOutput = z.object({
+  space: spaceRef,
+  page: pageRef,
+  html: z.string(),
+});
+
+function registerGetPage(server: McpServer) {
+  server.registerTool(
+    "get_page",
+    {
+      title: "Get page",
+      description:
+        "Read one page's document body as HTML, by space and page slug. The body " +
+        "is the markup the editor edits: paragraphs, headings, lists, links, " +
+        "images and component blocks. Read it before changing a page, and send " +
+        "the whole document back to set_page_blocks to write it.",
+      inputSchema: pageInput,
+      outputSchema: pageBodyOutput,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, page: pageSlug }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const page = await getPage(space.id, pageSlug);
+      if (!page) return pageNotFound(pageSlug, space.name);
+
+      const html = pageHtml(page.blocks);
+      return {
+        content: [{ type: "text" as const, text: html || `${page.title} is empty.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          page: { id: page.id, title: page.title, slug: page.slug },
+          html,
+        },
+      };
+    },
+  );
+}
+
+const setPageBodyOutput = z.object({
+  space: spaceRef,
+  page: pageRef,
+  characters: z.number().int(),
+  replaced: z.boolean(),
+});
+
+function registerSetPageBlocks(server: McpServer) {
+  server.registerTool(
+    "set_page_blocks",
+    {
+      title: "Set page blocks",
+      description:
+        "Replace a page's entire document body with HTML, by space and page slug. " +
+        "This replaces rather than merges, so read the page with get_page first " +
+        "and send back the full document. Markup the editor cannot keep is " +
+        "refused with the reason, instead of being saved and then silently " +
+        "dropped the next time someone opens the page.",
+      inputSchema: pageInput.extend({
+        html: z.string().describe("The complete document body, as HTML."),
+      }),
+      outputSchema: setPageBodyOutput,
+      // Replaces content rather than adding to it, so it is destructive even
+      // though sending the same document twice leaves the same document.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, page: pageSlug, html }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const page = await getPage(space.id, pageSlug);
+      if (!page) return pageNotFound(pageSlug, space.name);
+
+      const problems = pageHtmlProblems(html);
+      if (problems.length) {
+        return toolError(
+          `The editor cannot keep all of that, so nothing was saved:\n- ${problems.join("\n- ")}`,
+        );
+      }
+
+      const replaced = await setPageHtml(page.id, html);
+      return {
+        content: [
+          { type: "text" as const, text: `Saved ${page.title} in ${space.name} (${html.length} characters).` },
+        ],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          page: { id: page.id, title: page.title, slug: page.slug },
+          characters: html.length,
+          replaced,
+        },
+      };
+    },
+  );
+}
+
+/**
  * Built per request: `createMcpHandler` calls this factory for every exchange,
  * so the server instance must not be shared or cached across requests.
  */
@@ -647,6 +765,8 @@ export function createCmsyMcpServer(): McpServer {
   const server = new McpServer(SERVER_INFO);
   registerListSpaces(server);
   registerListPages(server);
+  registerGetPage(server);
+  registerSetPageBlocks(server);
   registerListComponents(server);
   registerGetDesignSystem(server);
   registerGetSpace(server);

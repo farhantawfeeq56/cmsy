@@ -6,38 +6,17 @@
  * `pages.blocks` — is rebuilt through the allowlist below before it is allowed
  * to become nodes. No HTML is ever interpolated into the server response, so
  * `sanitize` is the single place untrusted markup crosses into the app.
+ *
+ * The allowlist itself lives in `@/db/page-html`, next to the column it
+ * describes, because the server-side checker and `set_page_blocks` read the
+ * same rules; only the rebuilding stays here, where a `DOMParser` exists.
  */
+
+import { DROP, STYLE_PROPERTIES, TAGS, unsafeUrl } from "@/db/page-html";
 
 export type Field = { key: string; label: string; fallback: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Tags whose whole subtree goes: keeping the text of a `<script>` is noise. */
-const DROP = new Set([
-  "SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META", "BASE",
-  "FORM", "INPUT", "BUTTON", "TEXTAREA", "SELECT", "OPTION", "VIDEO", "AUDIO",
-  "CANVAS", "SVG", "MATH", "TEMPLATE", "NOSCRIPT",
-]);
-
-/** Allowed tags, and the attributes allowed on each. */
-const TAGS: Record<string, string[]> = {
-  P: [], BR: [], HR: [], DIV: ["data-block", "data-block-id", "data-component-id", "data-name", "data-values"],
-  H1: [], H2: [], H3: [], H4: [], H5: [], H6: [],
-  UL: [], OL: [], LI: [], BLOCKQUOTE: [], PRE: [], CODE: [],
-  STRONG: [], B: [], EM: [], I: [], U: [], S: [], SUB: [], SUP: [],
-  A: ["href", "title"], IMG: ["src", "alt"],
-  SPAN: ["data-block-name", "data-field", "data-label"],
-};
-
-/** Inline styles are kept only when they are formatting the toolbar produced. */
-const STYLE_PROPERTIES = new Set([
-  "font-weight", "font-style", "text-decoration", "text-decoration-line",
-  "text-align", "color",
-]);
-
-/** Anything without a scheme is fine (relative paths, `#anchors`). */
-const unsafeUrl = (value: string) =>
-  /^\s*(?:javascript|vbscript|data|file):/i.test(value.replace(/[\u0000-\u001f]/g, ""));
 
 /** Attribute-safe escaping for the markup this module generates itself. */
 export const esc = (value: string) =>

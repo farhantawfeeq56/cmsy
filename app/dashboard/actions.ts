@@ -10,6 +10,7 @@ import {
   importComponent as copyComponent,
   insertWithSlug,
   LIMITS,
+  setPageHtml,
   slugify,
 } from "@/db";
 
@@ -26,9 +27,6 @@ function uuid(value: FormDataEntryValue | null) {
 }
 
 const refresh = () => revalidatePath("/dashboard", "layout");
-
-/** ~200KB of HTML is already a very long page; the cap bounds a hostile save. */
-const MAX_BODY = 200_000;
 
 export async function createSpace(formData: FormData) {
   const name = text(formData.get("name"), LIMITS.spaceName);
@@ -64,9 +62,7 @@ export async function savePageBlocks(id: string, html: string) {
   const pageId = uuid(id);
   if (!pageId || typeof html !== "string") return;
 
-  await db()`update pages
-    set blocks = ${JSON.stringify({ html: html.slice(0, MAX_BODY) })}::jsonb
-    where id = ${pageId}`;
+  await setPageHtml(pageId, html);
 }
 
 /** Titles are edited in place, so this is submitted on blur and on Enter. */

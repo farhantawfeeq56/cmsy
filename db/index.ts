@@ -140,6 +140,22 @@ export function pageHtml(blocks: unknown) {
   return typeof html === "string" ? html : "";
 }
 
+/**
+ * Replaces a page's document body. The body is HTML inside the `blocks` jsonb,
+ * so an existing page needs no migration. Both writers — the editor's autosave
+ * and the `set_page_blocks` MCP tool — come through here, so the cap is applied
+ * once instead of by whichever caller remembered it.
+ */
+export async function setPageHtml(id: string, html: string) {
+  const found = await rows<{ id: string }>(db()`
+    update pages
+    set blocks = ${JSON.stringify({ html: html.slice(0, LIMITS.pageBody) })}::jsonb
+    where id = ${id}
+    returning id
+  `);
+  return found.length > 0;
+}
+
 export const listComponents = (spaceId: string) =>
   rows<ComponentRow>(db()`
     select c.id, c.name, c.description,
@@ -170,7 +186,13 @@ export const listImportable = (spaceId: string) =>
  * cannot drift: each caller validates its own input shape, and the SQL lives
  * here once. The limits are the dashboard form's, applied by both callers.
  */
-export const LIMITS = { spaceName: 80, componentName: 80, componentDescription: 300 };
+export const LIMITS = {
+  spaceName: 80,
+  componentName: 80,
+  componentDescription: 300,
+  /** ~200KB of HTML is already a very long page; the cap bounds a hostile save. */
+  pageBody: 200_000,
+};
 
 export function slugify(value: string) {
   const slug = value

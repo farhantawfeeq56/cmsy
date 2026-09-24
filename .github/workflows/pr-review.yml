@@ -8,8 +8,9 @@ name: PR review
 # It authenticates with a Claude subscription token, so each review counts
 # against that subscription's usage limits. To keep usage down it does not
 # re-review on every push; add the `review-again` label to ask for another
-# pass after changes. If the CLAUDE_CODE_OAUTH_TOKEN secret is missing or the
-# subscription has lapsed, the review step fails quietly and the PR stays green.
+# pass after changes, on a draft too. The label clears when the review ends.
+# If the CLAUDE_CODE_OAUTH_TOKEN secret is missing or the subscription has
+# lapsed, the review step fails quietly and the PR stays green.
 
 on:
   pull_request:
@@ -26,22 +27,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Clears the label so it can be added again for the next review. This is its
-  # own job so it also runs when the review is skipped, for example on a draft;
-  # a label left in place would make the next request fire no event at all.
-  clear-label:
-    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'review-again' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Remove review-again label
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label review-again --repo ${{ github.repository }}
-
+  # Drafts are skipped unless someone asks with the label, because an explicit
+  # request should never be dropped without a word.
   review:
     if: >-
-      ${{ !github.event.pull_request.draft &&
-          (github.event.action != 'labeled' || github.event.label.name == 'review-again') }}
+      ${{ (github.event.action == 'labeled' && github.event.label.name == 'review-again') ||
+          (github.event.action != 'labeled' && !github.event.pull_request.draft) }}
     runs-on: ubuntu-latest
     steps:
       # The review never pushes, so the checkout keeps no credentials.
@@ -92,3 +83,12 @@ jobs:
             --max-turns 20
             --allowedTools "Read,Grep,Glob,Bash(gh pr view ${{ github.event.pull_request.number }}),Bash(gh pr view ${{ github.event.pull_request.number }} *),Bash(gh pr diff ${{ github.event.pull_request.number }} *),Bash(gh pr diff ${{ github.event.pull_request.number }}),Bash(gh pr comment ${{ github.event.pull_request.number }} *)"
             --disallowedTools "Read(./.git/**)"
+
+      # The label stays on while the review runs, which shows it is in progress
+      # and stops a second request from cancelling it. Removing it afterwards
+      # lets it be added again for the next pass.
+      - name: Remove review-again label
+        if: ${{ always() && github.event.action == 'labeled' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label review-again --repo ${{ github.repository }}

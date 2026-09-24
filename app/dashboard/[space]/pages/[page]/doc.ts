@@ -12,7 +12,7 @@ export type Field = { key: string; label: string; fallback: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Tags whose whole subtree goes: keeeping the text of a `<script>` is noise. */
+/** Tags whose whole subtree goes: keeping the text of a `<script>` is noise. */
 const DROP = new Set([
   "SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META", "BASE",
   "FORM", "INPUT", "BUTTON", "TEXTAREA", "SELECT", "OPTION", "VIDEO", "AUDIO",
@@ -99,8 +99,16 @@ function clean(root: HTMLElement) {
         el.removeAttribute("data-values");
       }
     }
-    if (el.getAttribute("data-block-name") !== null) el.classList.add("badge");
-    if (el.getAttribute("data-field") !== null) el.classList.add("comp-field");
+    // A block's own markup, and only inside a block: a pasted `<span data-field>`
+    // must not render as if it were an editable component field.
+    if (el.parentElement?.closest(".comp-block")) {
+      if (el.getAttribute("data-block-name") !== null) el.classList.add("badge");
+      if (el.getAttribute("data-field") !== null) el.classList.add("comp-field");
+    } else if (el.tagName === "SPAN") {
+      for (const attribute of ["data-block-name", "data-field", "data-label"]) {
+        el.removeAttribute(attribute);
+      }
+    }
   }
 }
 

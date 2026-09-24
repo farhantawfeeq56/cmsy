@@ -73,6 +73,7 @@ export function PageEditor({
   const save = useCallback(async () => {
     const canvas = root.current;
     if (!canvas) return;
+    if (timer.current) clearTimeout(timer.current);
     dirty.current = false;
     setStatus("saving");
     await savePageBlocks(page.id, sanitize(canvas.innerHTML));

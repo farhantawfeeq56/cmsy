@@ -47,6 +47,9 @@ function parseYaml(src) {
 const asTree = (value) =>
   typeof value === "object" && value !== null ? value : {};
 
+/** Frontmatter groups that are design tokens, as opposed to `name` / `description`. */
+const TOKEN_GROUPS = ["colors", "typography", "rounded", "spacing", "components"];
+
 /** DESIGN.md → the rules the Design System view renders. */
 function parseDesign(source) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(source);
@@ -81,6 +84,9 @@ function parseDesign(source) {
         return { title: title.trim(), lines };
       })
       .filter((section) => section.title),
+    // The token groups verbatim. Each space's `design_systems.tokens` starts as
+    // a copy of these, and the database copy is canonical from then on.
+    tokens: Object.fromEntries(TOKEN_GROUPS.map((group) => [group, asTree(meta[group])])),
   };
 }
 

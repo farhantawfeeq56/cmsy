@@ -42,6 +42,9 @@ async function insertWithSlug(
 
 const refresh = () => revalidatePath("/dashboard", "layout");
 
+/** ~200KB of HTML is already a very long page; the cap bounds a hostile save. */
+const MAX_BODY = 200_000;
+
 export async function createSpace(formData: FormData) {
   const name = text(formData.get("name"), 80);
   if (!name) return;
@@ -75,6 +78,31 @@ export async function createPage(formData: FormData) {
       on conflict (space_id, slug) do nothing returning id`,
     slugify(title),
   );
+  refresh();
+}
+
+/**
+ * The document, autosaved from the Page editor. The body is stored as an HTML
+ * string inside the `blocks` jsonb, so an existing page needs no migration.
+ * Deliberately no `revalidatePath` on the editor's own route: a refresh while
+ * someone is typing would fight the unsaved canvas for no benefit.
+ */
+export async function savePageBlocks(id: string, html: string) {
+  const pageId = uuid(id);
+  if (!pageId || typeof html !== "string") return;
+
+  await db()`update pages
+    set blocks = ${JSON.stringify({ html: html.slice(0, MAX_BODY) })}::jsonb
+    where id = ${pageId}`;
+}
+
+/** Titles are edited in place, so this is submitted on blur and on Enter. */
+export async function renamePage(formData: FormData) {
+  const id = uuid(formData.get("id"));
+  const title = text(formData.get("title"), 120);
+  if (!id || !title) return;
+
+  await db()`update pages set title = ${title} where id = ${id}`;
   refresh();
 }
 

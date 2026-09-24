@@ -122,3 +122,100 @@ body {
 .tab:hover { color: var(--color-ink); }
 
 .tab[data-active="true"] { background: #1111110d; color: var(--color-ink); }
+
+/* Page editor — a document surface, not a design surface (see DESIGN.md).
+   The canvas markup is built as HTML strings, so it is styled here rather
+   than with utility classes. */
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  min-width: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  color: var(--color-smoke);
+  font-size: 0.8125rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tool:hover { background: #1111110d; color: var(--color-ink); }
+.tool[data-active] { background: #1111110d; color: var(--color-ink); }
+.tool-select {
+  width: auto;
+  border: 0;
+  background: transparent;
+  padding-right: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tool-sep { width: 1px; height: 1.25rem; margin: 0 0.375rem; background: var(--color-line); }
+
+.doc-page { width: 100%; max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.5rem 10rem; }
+
+.doc-title {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  color: var(--color-ink);
+  font-family: var(--font-nohemi), Arial, sans-serif;
+  font-size: 2.75rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -1.76px;
+}
+
+/* The writing surface itself: one column, headings in Nohemi, body in Jakarta. */
+.doc { margin-top: 1.5rem; min-height: 60vh; outline: none; line-height: 1.7; overflow-wrap: break-word; }
+.doc > * + * { margin-top: 0.75rem; }
+.doc h1, .doc h2, .doc h3 {
+  font-family: var(--font-nohemi), Arial, sans-serif;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-top: 1.75rem;
+}
+.doc h1 { font-size: 2rem; }
+.doc h2 { font-size: 1.5rem; }
+.doc h3 { font-size: 1.125rem; }
+.doc ul { list-style: disc; padding-left: 1.5rem; }
+.doc ol { list-style: decimal; padding-left: 1.5rem; }
+.doc li { margin: 0.25rem 0; }
+.doc blockquote { border-left: 2px solid var(--color-line); padding-left: 1rem; color: var(--color-smoke); }
+.doc a { color: var(--color-signal); text-decoration: underline; }
+.doc img { max-width: 100%; border-radius: 12px; }
+.doc code { border-radius: 4px; background: #1111110a; padding: 0.1rem 0.25rem; font-size: 0.875em; }
+.doc pre { border-radius: 8px; background: #1111110a; padding: 0.75rem 1rem; overflow-x: auto; font-size: 0.875rem; }
+.doc pre code { background: none; padding: 0; }
+.doc hr { border: 0; border-top: 1px solid var(--color-line); margin: 1.5rem 0; }
+
+/* An inserted component. The page holds it and fills its fields; the look of
+   it belongs to the Components Editor, so nothing here is a styling control. */
+.comp-block {
+  margin: 1rem 0;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-card);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.comp-block:hover { border-color: #11111126; }
+.comp-block.is-selected { border-color: var(--accent); box-shadow: 0 0 0 3px #b7efb24d; }
+.comp-block > .badge { margin: 0.125rem 0 0.375rem; }
+.comp-field { display: block; color: var(--color-ink); font-size: 0.9375rem; }
+.comp-field + .comp-field { margin-top: 0.125rem; }
+.comp-field::before {
+  content: attr(data-label) ": ";
+  color: var(--color-smoke);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .doc-title { font-size: 2rem; letter-spacing: -1px; }
+  .doc-page { padding: 1.5rem 1rem 8rem; }
+}

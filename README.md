@@ -71,20 +71,6 @@ This makes it possible to move from:
 Design / Edit → Structured instruction → Agent → Codebase
 ```
 
-## Design system
-
-CMSy's visual rules live in [`DESIGN.md`](./DESIGN.md) — colours, type scale, radii and the
-guidelines prose. The Design area of a space renders that file, so editing DESIGN.md *is* how
-you change the design system; there is nothing to keep in sync by hand.
-
-`scripts/sync-design.mjs` turns it into `app/dashboard/[space]/design.generated.json`, which is
-committed so both bundlers can import it without a loader. It runs automatically before `dev`
-and `build`; to regenerate on its own:
-
-```bash
-npm run design:sync
-```
-
 ## Toolchain
 
 Node 24 and npm 11.11 or newer (`.nvmrc`, and `devEngines` in `package.json`). `npm install`
@@ -98,6 +84,20 @@ npm -v             # must print 11.11 or newer; Node 24 ships one
 
 If `npm -v` still prints 10.x under Node 24, a global npm elsewhere on your `PATH` is
 shadowing the bundled one. `npm config get prefix` shows where it lives.
+
+## Design system
+
+CMSy's visual rules live in [`DESIGN.md`](./DESIGN.md) — colours, type scale, radii and the
+guidelines prose. The Design area of a space renders that file, so editing DESIGN.md *is* how
+you change the design system; there is nothing to keep in sync by hand.
+
+`scripts/sync-design.mjs` turns it into `app/dashboard/[space]/design.generated.json`, which is
+committed so both bundlers can import it without a loader. It runs automatically before `dev`
+and `build`; to regenerate on its own:
+
+```bash
+npm run design:sync
+```
 
 ## Running the MCP server
 

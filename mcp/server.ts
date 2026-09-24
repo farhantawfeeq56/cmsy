@@ -3,7 +3,7 @@ import { z } from "zod";
 // Relative, not `@/db`: this module is deliberately framework-free so a stdio
 // entry point can import it from a plain Node process, where the `@/*` alias
 // that Next's bundler resolves is not available.
-import { getSpace, listComponents, listPages, listSpaces } from "../db";
+import { getDesignSystem, getSpace, listComponents, listPages, listSpaces } from "../db";
 
 export const SERVER_INFO = {
   name: "cmsy",
@@ -235,6 +235,95 @@ function registerListComponents(server: McpServer) {
   );
 }
 
+const getDesignSystemOutput = z.object({
+  space: spaceRef,
+  designSystem: z
+    .object({
+      name: z.string(),
+      ownedBy: spaceRef.nullable(),
+      importedFromAnotherSpace: z.boolean(),
+      tokenCount: z.number().int(),
+      tokens: z.record(z.string(), z.unknown()),
+    })
+    .nullable(),
+});
+
+/** Entries across the token groups; a bare top-level value counts as one. */
+function countTokens(tokens: Record<string, unknown>) {
+  return Object.values(tokens).reduce<number>(
+    (sum, group) =>
+      sum + (typeof group === "object" && group !== null ? Object.keys(group).length : 1),
+    0,
+  );
+}
+
+function registerGetDesignSystem(server: McpServer) {
+  server.registerTool(
+    "get_design_system",
+    {
+      title: "Get design system",
+      description:
+        "Read the design system one space uses, with its tokens. Call this before " +
+        "building or styling a component so it follows the space's colours, type " +
+        "and spacing instead of guessing. Tokens are grouped (colors, typography, " +
+        "rounded, spacing, components); a value like `{colors.primary}` refers to " +
+        "another token. A space can use a system another space owns — `ownedBy` " +
+        "says whose it is, and editing it would change every space that uses it.",
+      inputSchema: spaceInput,
+      outputSchema: getDesignSystemOutput,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ space: slug }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const ref = { name: space.name, slug: space.slug };
+      const system = space.design_system_id ? await getDesignSystem(space.design_system_id) : null;
+
+      if (!system) {
+        return {
+          content: [{ type: "text" as const, text: `${space.name} has no design system selected.` }],
+          structuredContent: { space: ref, designSystem: null },
+        };
+      }
+
+      const ownedBy = system.owner_space_slug
+        ? { name: system.owner_space_name ?? system.owner_space_slug, slug: system.owner_space_slug }
+        : null;
+      const imported = system.owner_space_id !== null && system.owner_space_id !== space.id;
+      const tokenCount = countTokens(system.tokens);
+
+      const structured = {
+        space: ref,
+        designSystem: {
+          name: system.name,
+          ownedBy,
+          importedFromAnotherSpace: imported,
+          tokenCount,
+          tokens: system.tokens,
+        },
+      };
+
+      const origin = imported && ownedBy ? `, shared from ${ownedBy.name} (${ownedBy.slug})` : "";
+      // An empty object must not read as "this space has no visual rules" — say
+      // plainly that none are recorded, so an agent asks instead of inventing.
+      const body = tokenCount
+        ? JSON.stringify(system.tokens, null, 2)
+        : "No tokens are recorded for this design system yet.";
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${space.name} uses "${system.name}"${origin} — ${tokenCount} tokens.\n\n${body}`,
+          },
+        ],
+        structuredContent: structured,
+      };
+    },
+  );
+}
+
 /**
  * Built per request: `createMcpHandler` calls this factory for every exchange,
  * so the server instance must not be shared or cached across requests.
@@ -244,5 +333,6 @@ export function createCmsyMcpServer(): McpServer {
   registerListSpaces(server);
   registerListPages(server);
   registerListComponents(server);
+  registerGetDesignSystem(server);
   return server;
 }

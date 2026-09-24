@@ -1,0 +1,52 @@
+name: Schema migration
+
+# main deploys to production as soon as it merges, but nothing applies
+# db/schema.sql to the production database. #66 shipped code that read two
+# new columns before anyone added them, and the Design view returned 500s
+# until they were (#69).
+#
+# So a PR that changes db/schema.sql must say the migration is already applied
+# to production. Schema changes here are additive (`if not exists`), which is
+# what makes "migrate first, then merge" safe: the old code ignores new columns.
+# Ticking the box re-runs this check, because `edited` is a trigger.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  applied:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              ...context.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            if (!files.some((file) => file.filename === 'db/schema.sql')) {
+              core.info('db/schema.sql is unchanged; nothing to check.');
+              return;
+            }
+
+            // The checklist line from AGENTS.md §3.5, ticked.
+            const ticked = /^\s*[-*]\s*\[[xX]\]\s*Schema applied to the production database/m;
+            if (ticked.test(pr.body ?? '')) {
+              core.info('db/schema.sql changed and the PR says it is applied to production.');
+              return;
+            }
+
+            core.setFailed(
+              'This PR changes db/schema.sql. Apply it to the production database ' +
+                'before merging (its owner runs `node db/migrate.mjs` with the production ' +
+                'DATABASE_URL), then tick "Schema applied to the production database" in ' +
+                'the PR body. See AGENTS.md §3.3.',
+            );

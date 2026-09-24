@@ -182,6 +182,14 @@ Rules: lowercase, hyphens, no spaces, max ~50 chars, **exactly one issue per bra
 - Update **docs/README/comments** when behavior or setup changes.
 - Keep the diff **reviewable**: aim for a PR someone can read in ~15 minutes. If it's growing, split the issue into sub-issues.
 - **Don't** reformat unrelated files, bump unrelated dependencies, or mix refactors with features.
+- **Schema changes are applied to production before merge, not after.** `main` deploys straight
+  to production, and nothing runs `db/schema.sql` against the production database, so code that
+  reads a new column breaks the moment it lands (#69). Keep schema changes additive
+  (`add column if not exists` with a default), so the code already running ignores them. Ask the
+  production database's owner (`@farhantawfeeq56`) to apply them with
+  `node db/migrate.mjs` and the production `DATABASE_URL` (rule 11), then tick the checklist line.
+  The `Schema migration` check fails any PR that changes `db/schema.sql` without it. The database
+  in your own `.env.local` may not be production; migrating it proves nothing about production.
 
 ### 3.4 Scope creep → new issue
 
@@ -221,6 +229,7 @@ Then open a PR **into `main`**:
   - [ ] Lint/format clean
   - [ ] Docs updated (if needed)
   - [ ] No secrets or unrelated changes
+  - [ ] Schema applied to the production database (only if `db/schema.sql` changed, §3.3)
   - [ ] Authored by: <agent name> on behalf of @<github-handle>
   ```
 

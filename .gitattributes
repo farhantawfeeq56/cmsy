@@ -1,0 +1,4 @@
+# Generated files are written with LF by their scripts. Without this, a machine
+# with core.autocrlf=true checks the file out as CRLF, the script rewrites it as
+# LF, and regenerating leaves the working tree permanently dirty.
+*.generated.json text eol=lf

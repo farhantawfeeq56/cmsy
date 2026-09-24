@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
+// Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
+import design from "./[space]/design.generated.json";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -57,10 +59,11 @@ export async function createSpace(formData: FormData) {
   );
   if (!row) return;
 
-  // A space starts with its own design system, which it can later swap out.
+  // A space starts with its own design system, seeded from DESIGN.md's tokens,
+  // which it can later edit or swap for another space's.
   const [designSystem] = (await db()`
-    insert into design_systems (space_id, name)
-    values (${row.id}, ${`${name} design system`})
+    insert into design_systems (space_id, name, tokens)
+    values (${row.id}, ${`${name} design system`}, ${JSON.stringify(design.tokens)}::jsonb)
     returning id`) as { id: string }[];
   await db()`update spaces set design_system_id = ${designSystem.id} where id = ${row.id}`;
 

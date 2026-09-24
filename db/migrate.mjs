@@ -7,6 +7,11 @@ const url = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set (run with --env-file=.env.local)");
 
 const sql = neon(url);
+
+// New spaces start from DESIGN.md's tokens; `npm run design:sync` generates this.
+const { tokens } = JSON.parse(
+  readFileSync(new URL("../app/dashboard/[space]/design.generated.json", import.meta.url), "utf8"),
+);
 const schema = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
 for (const statement of schema.split(";").map((s) => s.trim()).filter(Boolean)) {
@@ -24,7 +29,7 @@ async function space(name, slug) {
   const [row] = await sql`insert into spaces (name, slug) values (${name}, ${slug}) returning id`;
   const [ds] = await sql`
     insert into design_systems (space_id, name, tokens)
-    values (${row.id}, ${`${name} design system`}, ${JSON.stringify({ ink: "#111111", paper: "#F6F5F3", accent: "#B7EFB2" })}::jsonb)
+    values (${row.id}, ${`${name} design system`}, ${JSON.stringify(tokens)}::jsonb)
     returning id`;
   await sql`update spaces set design_system_id = ${ds.id} where id = ${row.id}`;
   return row.id;

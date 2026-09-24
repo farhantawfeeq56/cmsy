@@ -113,9 +113,11 @@ export default async function DashboardPage() {
             {activity.map((item) => (
               <li key={`${item.kind}-${item.id}`}>
                 <Link
-                  href={`/dashboard/${item.space_slug}?tab=${
-                    item.kind === "page" ? "pages" : "components"
-                  }`}
+                  href={
+                    item.kind === "page"
+                      ? `/dashboard/${item.space_slug}`
+                      : `/dashboard/${item.space_slug}?view=design`
+                  }
                   className="flex items-center gap-4 py-3.5"
                 >
                   <span

@@ -16,9 +16,24 @@ import {
   importComponent,
   useDesignSystem,
 } from "../actions";
+// Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
+import design from "./design.generated.json";
 
-const TABS = ["pages", "components", "design"] as const;
-type Tab = (typeof TABS)[number];
+/**
+ * Two levels, not three equal tabs: Pages are the content this space is for,
+ * Design is the visual system behind it. `?tab=` is the old three-tab scheme,
+ * still honoured so existing links keep working.
+ */
+const VIEWS = ["pages", "design"] as const;
+type View = (typeof VIEWS)[number];
+
+const LABEL: Record<View, string> = { pages: "Pages", design: "Design" };
+
+const viewOf = (value: string | string[] | undefined): View => {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === "components" || raw === "design") return "design";
+  return "pages";
+};
 
 /** Shared by the New Page popover and the row menus. */
 const POPOVER =
@@ -28,38 +43,67 @@ const SUMMARY = "cursor-pointer list-none [&::-webkit-details-marker]:hidden";
 export default async function SpacePage(props: PageProps<"/dashboard/[space]">) {
   const { space: slug } = await props.params;
   const query = await props.searchParams;
-  const requested = Array.isArray(query.tab) ? query.tab[0] : query.tab;
-  const tab: Tab = TABS.includes(requested as Tab) ? (requested as Tab) : "pages";
+  const view = viewOf(query.view ?? query.tab);
 
   const space = await getSpace(slug);
   if (!space) notFound();
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
-      <header className="min-w-0">
-        <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">{space.name}</h1>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
-          Build and manage your pages, components and design system.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">{space.name}</h1>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
+            Pages are where this space writes and publishes. Components and the design
+            system live in Design.
+          </p>
+        </div>
+
+        <nav
+          aria-label="Space sections"
+          className="flex shrink-0 gap-1 rounded-lg border border-line bg-card p-1"
+        >
+          {VIEWS.map((item) => (
+            <Link
+              key={item}
+              href={item === "pages" ? `/dashboard/${space.slug}` : `/dashboard/${space.slug}?view=design`}
+              aria-current={view === item ? "page" : undefined}
+              data-active={view === item}
+              className="tab"
+            >
+              {LABEL[item]}
+            </Link>
+          ))}
+        </nav>
       </header>
 
-      {tab === "pages" ? (
-        <PagesTab space={space} />
+      {/* The design context stays one click away while writing pages. */}
+      {view === "pages" && (
+        <Link
+          href={`/dashboard/${space.slug}?view=design`}
+          className="group flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-ink/20"
+        >
+          <span aria-hidden className="size-2 shrink-0 rounded-full bg-mint" />
+          <span className="min-w-0 flex-1 truncate text-sm">
+            <span className="font-medium">
+              {space.design_system_name ?? "No design system"}
+            </span>
+            <span className="text-smoke">
+              {" · "}
+              {space.component_count}{" "}
+              {space.component_count === 1 ? "component" : "components"}
+            </span>
+          </span>
+          <span aria-hidden className="shrink-0 text-xs text-smoke group-hover:text-ink">
+            Design →
+          </span>
+        </Link>
+      )}
+
+      {view === "pages" ? (
+        <PagesView space={space} />
       ) : (
-        <div>
-          {/* The tiles are the way into these views, so they need a way back. */}
-          <Link
-            href={`/dashboard/${space.slug}?tab=pages`}
-            className="btn btn-quiet -ml-2.5 mb-4"
-          >
-            ← Pages
-          </Link>
-          {tab === "components" ? (
-            <ComponentsTab spaceId={space.id} />
-          ) : (
-            <DesignTab spaceId={space.id} designSystemId={space.design_system_id} />
-          )}
-        </div>
+        <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
       )}
     </main>
   );
@@ -72,64 +116,12 @@ type SpaceSummary = {
   design_system_name: string | null;
 };
 
-async function PagesTab({ space }: { space: SpaceSummary }) {
+async function PagesView({ space }: { space: SpaceSummary }) {
   const pages = await listPages(space.id);
 
   return (
     <section>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Link
-          href={`/dashboard/${space.slug}?tab=components`}
-          className="group flex items-center gap-4 rounded-xl border border-line bg-white p-4 transition-colors hover:border-ink/20"
-        >
-          <span
-            aria-hidden
-            className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-lilac"
-          >
-            <CubeIcon className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="font-primary block truncate text-base font-medium tracking-tight">
-              Components
-            </span>
-            <span className="block text-sm text-smoke">
-              {space.component_count}{" "}
-              {space.component_count === 1 ? "component" : "components"}
-            </span>
-          </span>
-          <span aria-hidden className="shrink-0 text-smoke transition-colors group-hover:text-ink">
-            →
-          </span>
-        </Link>
-
-        <Link
-          href={`/dashboard/${space.slug}?tab=design`}
-          className="group flex items-center gap-4 rounded-xl border border-line bg-white p-4 transition-colors hover:border-ink/20"
-        >
-          <span
-            aria-hidden
-            className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-mint"
-          >
-            <PencilIcon className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="font-primary block truncate text-base font-medium tracking-tight">
-              Design System
-            </span>
-            <span className="block truncate text-sm text-smoke">
-              {space.design_system_name ?? "Not set"}
-            </span>
-          </span>
-          <span
-            aria-hidden
-            className="shrink-0 text-base text-smoke transition-colors group-hover:text-ink"
-          >
-            →
-          </span>
-        </Link>
-      </div>
-
-      <div className="mt-8 flex items-start justify-between gap-4 border-t border-line pt-6">
+      <div className="flex items-start justify-between gap-4 border-t border-line pt-6">
         <div>
           <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Pages</h2>
           <p className="mt-1 text-sm text-smoke">
@@ -169,7 +161,7 @@ async function PagesTab({ space }: { space: SpaceSummary }) {
 
       {pages.length === 0 ? (
         <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
-          No pages yet. Add the first one to start building.
+          No pages yet. Add the first one to start writing.
         </p>
       ) : (
         <ul className="mt-5 divide-y divide-line border-t border-line">
@@ -285,96 +277,290 @@ function ComponentPreview({ name, description }: { name: string; description: st
   }
 }
 
-async function ComponentsTab({ spaceId }: { spaceId: string }) {
+/** Renders DESIGN.md prose: bullets and paragraphs, with bold/code inline. */
+function Prose({ lines }: { lines: string[] }) {
+  const inline = (text: string) =>
+    text
+      .split(/(\*\*[^*]+\*\*|`[^`]+`)/)
+      .filter(Boolean)
+      .map((part, index) =>
+        part.startsWith("**") ? (
+          <strong key={index} className="font-medium text-ink">
+            {part.slice(2, -2)}
+          </strong>
+        ) : part.startsWith("`") ? (
+          <code key={index} className="rounded bg-[#1111110a] px-1 py-0.5 text-xs">
+            {part.slice(1, -1)}
+          </code>
+        ) : (
+          part
+        ),
+      );
+
+  const blocks: React.ReactNode[] = [];
+  let paragraph: string[] = [];
+  let bullets: string[] = [];
+
+  const flush = () => {
+    if (paragraph.length) {
+      blocks.push(
+        <p key={blocks.length} className="text-sm leading-relaxed text-smoke">
+          {inline(paragraph.join(" "))}
+        </p>,
+      );
+      paragraph = [];
+    }
+    if (bullets.length) {
+      blocks.push(
+        <ul key={blocks.length} className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-smoke">
+          {bullets.map((bullet, index) => (
+            <li key={index}>{inline(bullet)}</li>
+          ))}
+        </ul>,
+      );
+      bullets = [];
+    }
+  };
+
+  for (const line of lines) {
+    if (!line.trim()) flush();
+    else if (line.startsWith("- ")) {
+      if (paragraph.length) flush();
+      bullets.push(line.slice(2));
+    } else if (bullets.length) {
+      // Wrapped bullet continuation, e.g. "  padding, flex with 0.5rem gap."
+      bullets[bullets.length - 1] += ` ${line.trim()}`;
+    } else paragraph.push(line.trim());
+  }
+  flush();
+
+  return <div className="space-y-3">{blocks}</div>;
+}
+
+/** DESIGN.md is the design system; this is the space's chosen name for it. */
+async function DesignSystemSection({
+  spaceId,
+  designSystemId,
+}: {
+  spaceId: string;
+  designSystemId: string | null;
+}) {
+  const systems = await listDesignSystems();
+  const current = systems.find((system) => system.id === designSystemId);
+
+  return (
+    <div>
+      <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Design System</h2>
+      <p className="mt-1 text-sm text-smoke">
+        The rules components and AI-generated UI follow, from{" "}
+        <code className="rounded bg-[#1111110a] px-1 py-0.5 text-xs">DESIGN.md</code>.
+      </p>
+
+      <div className="card mt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-primary text-lg font-medium tracking-tight">
+              {current?.name ?? "No design system"}
+            </h3>
+            <p className="mt-1 text-xs text-smoke">
+              {current
+                ? current.space_id === spaceId
+                  ? `Owned by this space · ${current.token_count} tokens`
+                  : `Imported from ${current.space_name} · ${current.token_count} tokens`
+                : "Pick one below to give this space a design system."}
+            </p>
+          </div>
+
+          {/* Swapping systems is rare, so it stays folded away. */}
+          {(!current || systems.length > 1) && (
+            <details className="relative shrink-0">
+              <summary className={`btn-quiet rounded-md ${SUMMARY}`}>Change</summary>
+              <form action={useDesignSystem} className={`${POPOVER} mt-2 w-72 max-w-[80vw] p-3`}>
+                <input type="hidden" name="spaceId" value={spaceId} />
+                <fieldset className="grid gap-1">
+                  <legend className="label mb-1 px-1">Use another space&apos;s system</legend>
+                  {systems.map((system) => (
+                    <label
+                      key={system.id}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-2 hover:bg-[#1111110a]"
+                    >
+                      <input
+                        type="radio"
+                        name="designSystemId"
+                        value={system.id}
+                        required
+                        defaultChecked={system.id === designSystemId}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{system.name}</span>
+                        <span className="block truncate text-xs text-smoke">
+                          {system.space_id === spaceId
+                            ? "This space"
+                            : `From ${system.space_name ?? "unassigned"}`}
+                          {" · "}
+                          {system.token_count} tokens
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+                <button type="submit" className="btn mt-2 w-full justify-center">
+                  Use selected system
+                </button>
+              </form>
+            </details>
+          )}
+        </div>
+
+        <p className="label mt-5">Colors</p>
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {design.colors.map((color) => (
+            <li
+              key={color.name}
+              className="flex items-center gap-2 rounded-lg border border-line bg-white py-1.5 pr-2.5 pl-1.5"
+            >
+              <span
+                aria-hidden
+                className="size-4 rounded-sm border border-line"
+                style={{ background: color.value }}
+              />
+              <span className="text-xs font-medium">{color.name}</span>
+              <span className="text-xs text-smoke">{color.value}</span>
+            </li>
+          ))}
+        </ul>
+
+        <p className="label mt-5">Typography</p>
+        <ul className="mt-1 divide-y divide-line">
+          {design.typography.map((step) => (
+            <li key={step.name} className="flex items-baseline justify-between gap-3 py-2">
+              <span className="text-sm font-medium">{step.name}</span>
+              <span className="text-right text-xs text-smoke">
+                {step.font} · {step.size} · {step.weight}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <p className="label mt-5">Radii</p>
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {design.rounded.map((shape) => (
+            <li key={shape.name} className="flex items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-1.5">
+              <span className="text-xs font-medium">{shape.name}</span>
+              <span className="text-xs text-smoke">{shape.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <details className="mt-3">
+        <summary className={`label px-1 py-1 ${SUMMARY}`}>Read the full guidelines</summary>
+        <div className="mt-3 space-y-5">
+          {design.guidelines.map((section) => (
+            <section key={section.title}>
+              <h4 className="font-primary text-base font-medium tracking-tight">
+                {section.title}
+              </h4>
+              <div className="mt-2">
+                <Prose lines={section.lines} />
+              </div>
+            </section>
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+async function ComponentsSection({ spaceId }: { spaceId: string }) {
   const [components, importable] = await Promise.all([
     listComponents(spaceId),
     listImportable(spaceId),
   ]);
+
   return (
-    <section className="space-y-8">
-      <div>
-        <h2 className="font-primary text-xl font-medium tracking-tight">Components</h2>
-        <form action={createComponent} className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <input type="hidden" name="spaceId" value={spaceId} />
-          <input
-            name="name"
-            required
-            maxLength={80}
-            placeholder="Component name"
-            aria-label="Component name"
-            className="input sm:max-w-[12rem]"
-          />
-          <input
-            name="description"
-            maxLength={300}
-            placeholder="What it does (optional)"
-            aria-label="Component description"
-            className="input"
-          />
-          <button type="submit" className="btn shrink-0 justify-center">
-            Create component
-          </button>
-        </form>
+    <div>
+      <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Components</h2>
+      <p className="mt-1 text-sm text-smoke">
+        Reusable UI built to the design system above.
+      </p>
 
-        {components.length === 0 ? (
-          <p className="mt-6 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
-            No components in this space yet.
-          </p>
-        ) : (
-          <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-            {components.map((component) => (
-              <li
-                key={component.id}
-                className="flex flex-col overflow-hidden rounded-xl border border-line bg-card"
-              >
-                {/* Preview first — every component reads visually, not just by name. */}
-                <div className="flex h-36 items-center justify-center border-b border-line bg-paper p-4">
-                  <ComponentPreview name={component.name} description={component.description} />
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-primary text-base font-medium tracking-tight">
-                      {component.name}
-                    </h3>
-                    <form action={deleteComponent}>
-                      <input type="hidden" name="id" value={component.id} />
-                      <input type="hidden" name="spaceId" value={spaceId} />
-                      <button type="submit" className="btn-quiet">
-                        Delete
-                      </button>
-                    </form>
-                  </div>
-                  {component.description && (
-                    <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
-                  )}
-                  <p className="mt-auto pt-1">
-                    {component.origin_space_name ? (
-                      <span className="badge">
-                        Imported · {component.origin_name} from {component.origin_space_name}
-                      </span>
-                    ) : (
-                      <span className="badge badge-quiet">Local</span>
-                    )}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <form action={createComponent} className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <input type="hidden" name="spaceId" value={spaceId} />
+        <input
+          name="name"
+          required
+          maxLength={80}
+          placeholder="Component name"
+          aria-label="Component name"
+          className="input sm:max-w-[12rem]"
+        />
+        <input
+          name="description"
+          maxLength={300}
+          placeholder="What it does (optional)"
+          aria-label="Component description"
+          className="input"
+        />
+        <button type="submit" className="btn shrink-0 justify-center">
+          Create component
+        </button>
+      </form>
 
-      <div>
-        <h2 className="font-primary text-xl font-medium tracking-tight">Import from another space</h2>
-        <p className="mt-1 text-sm text-smoke">
-          Imported components stay linked to the space they came from, so you can
-          tell them apart from local ones.
+      {components.length === 0 ? (
+        <p className="mt-6 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
+          No components in this space yet.
         </p>
+      ) : (
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+          {components.map((component) => (
+            <li
+              key={component.id}
+              className="flex flex-col overflow-hidden rounded-xl border border-line bg-card"
+            >
+              {/* Preview first — every component reads visually, not just by name. */}
+              <div className="flex h-36 items-center justify-center border-b border-line bg-paper p-4">
+                <ComponentPreview name={component.name} description={component.description} />
+              </div>
+              <div className="flex flex-1 flex-col gap-2 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-primary text-base font-medium tracking-tight">
+                    {component.name}
+                  </h3>
+                  <form action={deleteComponent}>
+                    <input type="hidden" name="id" value={component.id} />
+                    <input type="hidden" name="spaceId" value={spaceId} />
+                    <button type="submit" className="btn-quiet">
+                      Delete
+                    </button>
+                  </form>
+                </div>
+                {component.description && (
+                  <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
+                )}
+                <p className="mt-auto pt-1">
+                  {component.origin_space_name ? (
+                    <span className="badge">
+                      Imported · {component.origin_name} from {component.origin_space_name}
+                    </span>
+                  ) : (
+                    <span className="badge badge-quiet">Local</span>
+                  )}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <details className="mt-6 border-t border-line pt-4">
+        <summary className={`label px-1 py-1 ${SUMMARY}`}>Import from another space</summary>
         {importable.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-line px-6 py-6 text-sm text-smoke">
+          <p className="mt-3 text-sm text-smoke">
             Nothing left to import from other spaces.
           </p>
         ) : (
-          <form action={importComponent} className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <form action={importComponent} className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input type="hidden" name="spaceId" value={spaceId} />
             <select
               name="componentId"
@@ -397,71 +583,23 @@ async function ComponentsTab({ spaceId }: { spaceId: string }) {
             </button>
           </form>
         )}
-      </div>
-    </section>
+      </details>
+    </div>
   );
 }
 
-async function DesignTab({
+async function DesignView({
   spaceId,
   designSystemId,
 }: {
   spaceId: string;
   designSystemId: string | null;
 }) {
-  const systems = await listDesignSystems();
-  const current = systems.find((system) => system.id === designSystemId);
-
   return (
-    <section>
-      <div className="card">
-        <p className="label">In use</p>
-        <h2 className="font-primary mt-1 text-xl font-medium tracking-tight">
-          {current?.name ?? "No design system"}
-        </h2>
-        <p className="mt-2 text-sm text-smoke">
-          {current
-            ? current.space_id === spaceId
-              ? `Owned by this space · ${current.token_count} tokens`
-              : `Imported from ${current.space_name} · ${current.token_count} tokens`
-            : "Pick one below to give this space a design system."}
-        </p>
-      </div>
-
-      <form action={useDesignSystem} className="mt-6">
-        <input type="hidden" name="spaceId" value={spaceId} />
-        <fieldset className="grid gap-2">
-          <legend className="label mb-2">Own it or import another space&apos;s</legend>
-          {systems.map((system) => (
-            <label
-              key={system.id}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-card px-4 py-3"
-            >
-              <input
-                type="radio"
-                name="designSystemId"
-                value={system.id}
-                required
-                defaultChecked={system.id === designSystemId}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{system.name}</span>
-                <span className="block text-xs text-smoke">
-                  {system.space_id === spaceId
-                    ? "This space"
-                    : `From ${system.space_name ?? "unassigned"}`}
-                  {" · "}
-                  {system.token_count} tokens
-                </span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-        <button type="submit" className="btn mt-4">
-          Use selected system
-        </button>
-      </form>
-    </section>
+    <div className="flex flex-col gap-10 border-t border-line pt-6">
+      <DesignSystemSection spaceId={spaceId} designSystemId={designSystemId} />
+      <ComponentsSection spaceId={spaceId} />
+    </div>
   );
 }
 
@@ -481,24 +619,6 @@ function icon(className: string | undefined, children: React.ReactNode) {
     </svg>
   );
 }
-
-const CubeIcon = ({ className }: { className?: string }) =>
-  icon(
-    className,
-    <>
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12" />
-    </>,
-  );
-
-const PencilIcon = ({ className }: { className?: string }) =>
-  icon(
-    className,
-    <>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </>,
-  );
 
 const FileIcon = ({ className }: { className?: string }) =>
   icon(

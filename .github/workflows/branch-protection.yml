@@ -1,0 +1,61 @@
+name: Branch protection
+
+# Fails when the rules GitHub enforces on main differ from
+# .github/rulesets/main-protection.json (#83). The spec is the agreed version;
+# the live ruleset is whatever an admin last set. A change to protection goes
+# through a PR that edits the spec (which is in the human lane), and the admin
+# applies it with the command this check prints.
+#
+# `protection` is itself a required check, so while main's rules have drifted
+# every PR is blocked until the two match again. On main and on the daily
+# schedule, a failure also opens an issue that tags both devs, so a change made
+# in Settings is seen even when no PR is open.
+#
+# The Actions token is not admin, so this cannot see the ruleset's bypass list.
+# The spec sets it to empty; applying the spec restores that.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare main's rules with the spec
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/protection.mjs drift
+
+  report:
+    needs: protection
+    if: ${{ failure() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="main protection has drifted from its spec"
+          body="The rules GitHub enforces on \`main\` no longer match \`.github/rulesets/main-protection.json\`. The run lists every difference and the command that restores the spec: $RUN_URL
+
+          @AathilFelix @farhantawfeeq56: if this change was intended, it needs a PR that updates the spec (AGENTS.md §0)."
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Still drifted: $RUN_URL"
+          else
+            gh issue create --title "$title" --label bug --body "$body"
+          fi

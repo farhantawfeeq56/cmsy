@@ -1,0 +1,42 @@
+name: Review lane
+
+# Decides whether a PR may merge as far as review goes (#83, AGENTS.md §3.7).
+# A PR that touches a path in .github/CODEOWNERS is in the human lane and fails
+# until the other dev approves its head commit with a line on what they
+# checked. Every other PR is in the fast lane and needs no approval. Either
+# lane fails while someone's latest review requests changes.
+#
+# `review-lane` is a required check in .github/rulesets/main-protection.json.
+# It re-runs whenever a review is submitted, edited or dismissed, so an approval
+# turns it green without a new push.
+#
+# This check runs the PR's own copy of this workflow, so a PR could edit it to
+# pass. That is why .github/ is itself in the human lane, and why the ruleset
+# also requires GitHub's own code-owner review, which reads CODEOWNERS from the
+# base branch and cannot be edited by the PR.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# The newest event has the newest reviews, so it supersedes any run in flight.
+concurrency:
+  group: review-lane-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review-lane:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the PR's review lane
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/protection.mjs lane --pr ${{ github.event.pull_request.number }}

@@ -7,8 +7,9 @@
 // `lane` puts a PR in the human lane when it touches a path listed in
 // .github/CODEOWNERS, read from the PR's base branch so a PR cannot edit itself
 // out. A human-lane PR passes once the other dev has approved its head commit
-// with a non-empty review body. Any PR, in either lane, fails while someone's
-// latest review requests changes.
+// with a non-empty review body. Any PR, in either lane, fails while a team
+// member's latest review requests changes. The team is everyone CODEOWNERS
+// names; other accounts' reviews never count.
 //
 // `drift` compares the rules GitHub enforces on main with
 // .github/rulesets/main-protection.json and fails on any difference, and checks
@@ -64,14 +65,15 @@ export function ownersFor(rules, file) {
 }
 
 /**
- * Each reviewer's latest decisive review. A plain comment does not cancel an
- * approval or a change request, so COMMENTED reviews are skipped, as GitHub
- * does. Pending (unsubmitted) reviews and bots are ignored.
+ * Each team member's latest decisive review. A plain comment does not cancel
+ * an approval or a change request, so COMMENTED reviews are skipped, as GitHub
+ * does. Pending (unsubmitted) reviews are ignored, and so is anyone outside the
+ * team: the repo is public, so any GitHub account can submit a review.
  */
-function latestDecisive(reviews) {
+function latestDecisive(reviews, team) {
   const latest = new Map();
   const decisive = reviews
-    .filter((r) => r.submitted_at && r.user?.type !== "Bot")
+    .filter((r) => r.submitted_at && team.has(r.user?.login?.toLowerCase()))
     .filter((r) => ["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(r.state))
     .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at));
   for (const review of decisive) latest.set(review.user.login.toLowerCase(), review);
@@ -93,7 +95,9 @@ export function laneVerdict({ author, headSha, files, reviews, rules }) {
     .map((file) => ({ file, owners: ownersFor(rules, file) }))
     .filter(({ owners }) => owners.length);
   const lane = guarded.length ? "human" : "fast";
-  const latest = latestDecisive(reviews);
+  // The team is everyone CODEOWNERS names; only their reviews count, in either lane.
+  const team = new Set(rules.flatMap((rule) => rule.owners));
+  const latest = latestDecisive(reviews, team);
   const problems = [];
 
   for (const [login, review] of latest) {

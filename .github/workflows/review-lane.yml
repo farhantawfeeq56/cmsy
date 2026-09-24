@@ -4,7 +4,8 @@ name: Review lane
 # A PR that touches a path in .github/CODEOWNERS is in the human lane and fails
 # until the other dev approves its head commit with a line on what they
 # checked. Every other PR is in the fast lane and needs no approval. Either
-# lane fails while someone's latest review requests changes.
+# lane fails while one of the devs' latest review requests changes; reviews
+# from anyone outside CODEOWNERS never count.
 #
 # `review-lane` is a required check in .github/rulesets/main-protection.json.
 # It re-runs whenever a review is submitted, edited or dismissed, so an approval

@@ -105,6 +105,12 @@ describe("laneVerdict", () => {
     expect(verdict(["AGENTS.md"], [bot, review("someone-else", "APPROVED")]).ok).toBe(false);
   });
 
+  it("ignores a change request from outside the team, since the repo is public", () => {
+    expect(verdict(["app/dashboard/page.tsx"], [review("drive-by-stranger", "CHANGES_REQUESTED")]).ok).toBe(true);
+    const bot = review("github-actions", "CHANGES_REQUESTED", { user: { login: "github-actions", type: "Bot" } });
+    expect(verdict(["app/dashboard/page.tsx"], [bot]).ok).toBe(true);
+  });
+
   it("uses each reviewer's latest decision, and a comment does not cancel it", () => {
     const approvedThenComment = [
       review("AathilFelix", "APPROVED", { submitted_at: "2026-09-24T15:00:00Z" }),

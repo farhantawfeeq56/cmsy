@@ -297,8 +297,9 @@ which lane a PR is in, and what it is still missing.
 - **A human-lane Approve must say what was checked.** Write one line or more in the review body.
   `review-lane` does not count an empty Approve, an Approve on an older commit, or the author's
   own. GitHub also dismisses an approval when new commits are pushed, so re-approve after changes.
-- **"Request changes" blocks, in either lane.** While anyone's latest review requests changes,
-  `review-lane` fails. It passes again once that reviewer approves or dismisses their review.
+- **"Request changes" blocks, in either lane.** While either dev's latest review requests
+  changes, `review-lane` fails. Reviews from accounts outside `CODEOWNERS` never count, since the
+  repo is public. It passes again once that reviewer approves or dismisses their review.
   Use it for a real objection, and say what would resolve it.
 - **Changing the lanes is itself human-lane work.** `CODEOWNERS`, the ruleset spec and the checks
   live under `.github/` and `scripts/protection.mjs`, so a PR that moves a path out of the human

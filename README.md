@@ -89,22 +89,30 @@ Deployed on Cloudflare Workers at
 
 ### Connecting an agent
 
-This repo ships a `.mcp.json`, so agents that read project-level MCP config
-(Claude Code, Cursor, Codex) pick the server up automatically when started
-from the repo root. To register it by hand:
+Start the app, open **[/dashboard/connect](http://localhost:3000/dashboard/connect)**,
+and paste. The page shows the endpoint for whatever URL you reached it on — loopback,
+the vinext port, or the deployed hostname — with ready-to-paste config for Claude Code,
+Cursor/VS Code and plain `curl`, each behind a copy button.
+
+If the host is not loopback the page also issues the bearer token those snippets need,
+and fills them in with it. That is the whole flow: **start the app → open the page →
+paste.**
+
+The checked-in `.mcp.json` still points at `http://localhost:3000/api/mcp`, so agents
+that read project-level MCP config (Claude Code, Cursor, Codex) attach automatically
+when started from the repo root. It stays on loopback deliberately — it is a dev
+convenience, not the onboarding path, which is how no secret ends up committed.
+
+Verify a connection without an agent:
 
 ```bash
-claude mcp add --transport http cmsy http://localhost:3000/api/mcp
+npm run mcp:smoke                                    # localhost:3000
+node scripts/mcp-smoke.mjs http://localhost:3001/api/mcp
+node scripts/mcp-smoke.mjs https://<your-deploy>/api/mcp cmsy_<token>
 ```
 
-Verify the connection without an agent:
-
-```bash
-curl -s -X POST http://localhost:3000/api/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
+It runs a real `initialize` + `tools/list` round trip over Streamable HTTP and exits
+non-zero on the first failure.
 
 ### Tools
 
@@ -118,8 +126,23 @@ imports so the same tools can later be served from a stdio process.
 
 ### Auth
 
-Local dev (loopback hosts) needs no token — the checked-in `.mcp.json`
-connects in one step. Any non-loopback host requires a bearer token:
+Local dev (loopback hosts) needs no token — the checked-in `.mcp.json` connects in one
+step. Any non-loopback host requires a bearer token, and there are two kinds.
+
+**Issued tokens (preferred).** Create them at `/dashboard/connect`. They are shown once,
+stored only as a SHA-256 hash, and checked against the database on every request, so the
+page can show a last-used time and revoke one with immediate effect. Because the token is
+already 256 bits of randomness, a single unsalted SHA-256 is the right hash here — there
+is no dictionary to defend against, and the digest has to be deterministic to look the
+token up.
+
+> **A public deploy is not safe until sign-in lands (#21).** Issuing a token requires no
+> authentication, so anyone who can load `/dashboard/connect` can mint a credential for
+> `/api/mcp`. Set `MCP_AUTH_TOKEN` on the Worker as well, so the endpoint does not depend
+> on the dashboard alone, and keep the deploy private until #21 is done.
+
+**`MCP_AUTH_TOKEN` (legacy fallback).** A single shared secret, kept working so
+deployments that predate issuance do not break:
 
 ```bash
 openssl rand -hex 32   # generate once, then add to .env.local:
@@ -127,11 +150,11 @@ openssl rand -hex 32   # generate once, then add to .env.local:
 ```
 
 The same variable must be set where the app is deployed (e.g.
-`wrangler secret put MCP_AUTH_TOKEN`). Without it the deployed endpoint
-refuses every non-loopback request with `401` rather than serving openly.
+`wrangler secret put MCP_AUTH_TOKEN`). It has no owner, no last-used time and cannot be
+revoked without a redeploy — prefer an issued token. Retiring it is tracked in #24.
 
-To connect an agent to a deployed instance, register the server with an
-`Authorization` header:
+Either way, register the server with an `Authorization` header (VS Code reads `servers`
+where Cursor and Claude Code read `mcpServers`):
 
 ```json
 {
@@ -139,16 +162,19 @@ To connect an agent to a deployed instance, register the server with an
     "cmsy": {
       "type": "http",
       "url": "https://<your-deploy>/api/mcp",
-      "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
+      "headers": { "Authorization": "Bearer <token>" }
     }
   }
 }
 ```
 
-Unauthenticated calls get a `401` + `WWW-Authenticate: Bearer` challenge;
-requests with a forged `Origin` get `403`. The token is a shared secret
-(there is no login flow issuing per-user tokens yet) — rotate it with
-`openssl rand` and update the secret wherever it is stored.
+Unauthenticated calls get a `401` + `WWW-Authenticate: Bearer` challenge; requests with a
+forged `Origin` get `403`. Unknown and revoked tokens are both answered `401` with the
+same message, so a caller cannot probe which of its tokens still exist.
+
+Tokens are not yet per-user in any real sense: CMSy has no sign-in flow, so every token
+belongs to whoever can open the dashboard. The `owner` column exists for when #24 starts
+writing the Neon Auth subject into it.
 
 ## Why CMSy?
 

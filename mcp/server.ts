@@ -20,10 +20,20 @@ import {
   listSpaces,
   pageHtml,
   setPageHtml,
+  updateComponent,
 } from "../db";
 // The leaf module, not `../db`: it is pure and import-free, so a test that
 // replaces the database functions still exercises the real checker.
 import { pageHtmlProblems } from "../db/page-html";
+// Also import-free, so a template is judged by the same rules the editor
+// enforces rather than by a second copy of them.
+import {
+  componentProblems,
+  parseProps,
+  parseTemplate,
+  PROP_LIMITS,
+  type Prop,
+} from "../db/component-template";
 
 export const SERVER_INFO = {
   name: "cmsy",
@@ -129,6 +139,15 @@ function pageNotFound(slug: string, spaceName: string) {
   return toolError(
     `No page with slug "${slug}" in ${spaceName}. Call list_pages to see the slugs that exist.`,
   );
+}
+
+/**
+ * A refusal reads as a list, so a model can fix every problem in one retry. The
+ * wording follows `set_page_blocks`, which refuses for the same reason: a caller
+ * told nothing has no way to notice its write was mangled.
+ */
+function refused(problems: string[]) {
+  return toolError(`Nothing was saved:\n- ${problems.join("\n- ")}`);
 }
 
 const listPagesOutput = z.object({
@@ -434,6 +453,91 @@ const componentResult = z.object({
   component: z.object({ id: z.string(), name: z.string() }),
 });
 
+/**
+ * What a component declares: the props a page fills in, and the template that
+ * turns them into markup. Both are optional on every write and only what is
+ * sent is written, because an agent cannot read a component back over MCP —
+ * `list_components` returns names, not templates. Lengths are capped here as
+ * well as in the parser so an over-long value is refused rather than sliced.
+ */
+const componentProps = z
+  .array(
+    z.object({
+      key: z
+        .string()
+        .max(PROP_LIMITS.key)
+        .describe("Identifier the template fills as {{key}}."),
+      label: z
+        .string()
+        .max(PROP_LIMITS.label)
+        .default("")
+        .describe("Field label in the page inspector. Defaults to the key."),
+      fallback: z
+        .string()
+        .max(PROP_LIMITS.fallback)
+        .default("")
+        .describe("Text a page shows until it sets its own."),
+    }),
+  )
+  .max(PROP_LIMITS.count)
+  .describe(`The props the component declares, up to ${PROP_LIMITS.count}.`);
+
+const componentTemplate = z
+  .string()
+  .max(PROP_LIMITS.template)
+  .describe(
+    "HTML that renders the props, with {{key}} in text — never inside a tag. " +
+      "Only the tags a page document allows survive, and no class.",
+  );
+
+/** What a write left stored, so a caller can see it without a read tool. */
+const componentDeclared = z.object({
+  props: z.array(z.object({ key: z.string(), label: z.string(), fallback: z.string() })),
+  template: z.string(),
+});
+
+const componentWriteOutput = componentResult.extend({ declared: componentDeclared });
+
+/**
+ * The props and template a write is giving a component, or the reasons it could
+ * not be saved. `undefined` comes back as `null`, meaning "leave that column".
+ *
+ * Refused rather than trimmed, the way `set_page_blocks` refuses: a prop the
+ * parser would drop and markup the editor would strip both come back as
+ * problems.
+ *
+ * `stored` is what the component already declares, and the two are checked as
+ * the pair they will be rendered as — not just the half that was sent. Sending
+ * props alone would otherwise skip the check, and a renamed prop would leave the
+ * stored template pointing at a name nothing declares, so the component would
+ * quietly stop rendering with nothing said at write time.
+ */
+function declaredFields(
+  input: { props?: Prop[]; template?: string },
+  stored: { props: Prop[]; template: string } = { props: [], template: "" },
+) {
+  const problems: string[] = [];
+  let props: Prop[] | null = null;
+
+  if (input.props !== undefined) {
+    props = parseProps(input.props);
+    const dropped = input.props.length - props.length;
+    if (dropped) {
+      problems.push(
+        `${dropped} of ${input.props.length} props would be dropped: a key must match ` +
+          "[a-zA-Z][a-zA-Z0-9_-]* and be unique within the component",
+      );
+    }
+  }
+
+  const template = input.template === undefined ? null : parseTemplate(input.template);
+  if (props !== null || template !== null) {
+    problems.push(...componentProblems(props ?? stored.props, template ?? stored.template));
+  }
+
+  return { problems, props, template };
+}
+
 function registerCreateComponent(server: McpServer) {
   server.registerTool(
     "create_component",
@@ -441,7 +545,10 @@ function registerCreateComponent(server: McpServer) {
       title: "Create component",
       description:
         "Add a component to a space. Names are unique within a space; if the " +
-        "name is taken, nothing is changed and the call returns an error.",
+        "name is taken, nothing is changed and the call returns an error. A " +
+        "component renders only once it declares props and a template, so send " +
+        "both here or with update_component — with neither it cannot be " +
+        "inserted into a page.",
       inputSchema: spaceInput.extend({
         name: z.string().trim().min(1).max(LIMITS.componentName).describe("Component name, e.g. PricingCard."),
         description: z
@@ -450,22 +557,109 @@ function registerCreateComponent(server: McpServer) {
           .max(LIMITS.componentDescription)
           .default("")
           .describe("One line on what the component is for."),
+        props: componentProps.optional(),
+        template: componentTemplate.optional(),
       }),
-      outputSchema: componentResult,
+      outputSchema: componentWriteOutput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
-    async ({ space: slug, name, description }) => {
+    async ({ space: slug, name, description, props, template }) => {
       const space = await getSpace(slug);
       if (!space) return spaceNotFound(slug);
 
-      const row = await createComponent(space.id, name, description);
+      const declared = declaredFields({ props, template });
+      if (declared.problems.length) return refused(declared.problems);
+
+      const row = await createComponent(
+        space.id,
+        name,
+        description,
+        declared.props ?? [],
+        declared.template ?? "",
+      );
       if (!row) return toolError(`${space.name} already has a component named "${name}".`);
 
+      const written = { props: declared.props ?? [], template: declared.template ?? "" };
       return {
-        content: [{ type: "text" as const, text: `Created ${name} in ${space.name}.` }],
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created ${name} in ${space.name}` +
+              (written.template
+                ? "."
+                : " with no template yet, so it cannot be inserted into a page until update_component gives it one."),
+          },
+        ],
         structuredContent: {
           space: { name: space.name, slug: space.slug },
           component: { id: row.id, name },
+          declared: written,
+        },
+      };
+    },
+  );
+}
+
+function registerUpdateComponent(server: McpServer) {
+  server.registerTool(
+    "update_component",
+    {
+      title: "Update component",
+      description:
+        "Give a component the props it declares and the template that renders " +
+        "them, by name. Only what you send is written, so a template can be " +
+        "replaced without re-sending the props; a template is judged against the " +
+        "props it will render with. Nothing is saved if either would not survive " +
+        "the editor — the reasons come back instead.",
+      inputSchema: spaceInput.extend({
+        component: z.string().min(1).describe("The component's name, as returned by list_components."),
+        props: componentProps.optional(),
+        template: componentTemplate.optional(),
+      }),
+      outputSchema: componentWriteOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ space: slug, component: name, props, template }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      if (props === undefined && template === undefined) {
+        return toolError("Send `props`, `template`, or both — there is nothing to update.");
+      }
+
+      const found = await findComponent(space.id, name);
+      if (!found) {
+        return toolError(
+          `${space.name} has no component named "${name}". Call list_components to see the names that exist.`,
+        );
+      }
+
+      const stored = parseProps(found.props);
+      const declared = declaredFields(
+        { props, template },
+        { props: stored, template: found.template },
+      );
+      if (declared.problems.length) return refused(declared.problems);
+
+      // False when the row no longer matches the id and space, which is what a
+      // delete between the lookup above and here looks like. Reporting success
+      // then would be a write this tool never made.
+      if (!(await updateComponent(space.id, found.id, declared.props, declared.template))) {
+        return toolError(
+          `${found.name} was removed from ${space.name} while this call was in flight. Call list_components to see what is left.`,
+        );
+      }
+
+      return {
+        content: [{ type: "text" as const, text: `Updated ${found.name} in ${space.name}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          component: { id: found.id, name: found.name },
+          declared: {
+            props: declared.props ?? stored,
+            template: declared.template ?? found.template,
+          },
         },
       };
     },
@@ -499,7 +693,7 @@ function registerDeleteComponent(server: McpServer) {
         content: [{ type: "text" as const, text: `Deleted ${found.name} from ${space.name}.` }],
         structuredContent: {
           space: { name: space.name, slug: space.slug },
-          component: found,
+          component: { id: found.id, name: found.name },
         },
       };
     },
@@ -783,6 +977,7 @@ export function createCmsyMcpServer(): McpServer {
   registerGetSpace(server);
   registerCreateSpace(server);
   registerCreateComponent(server);
+  registerUpdateComponent(server);
   registerDeleteComponent(server);
   registerListImportable(server);
   registerImportComponent(server);

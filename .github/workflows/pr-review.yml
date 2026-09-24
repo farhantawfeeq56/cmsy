@@ -1,0 +1,79 @@
+name: PR review
+
+# Gives every PR into main an automated first-pass review: at most two
+# recommendations, each saying what is wrong, why it matters and how to fix
+# it. It is a pointer for the human reviewer, not a substitute for one, and it
+# never fails the PR. See #56.
+#
+# It authenticates with a Claude subscription token, so each review counts
+# against that subscription's usage limits. To keep usage down it does not
+# re-review on every push; add the `review-again` label to ask for another
+# pass after changes. If the CLAUDE_CODE_OAUTH_TOKEN secret is missing or the
+# subscription has lapsed, the review step fails quietly and the PR stays green.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# A second request for the same PR supersedes the review already in flight.
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      ${{ !github.event.pull_request.draft &&
+          (github.event.action != 'labeled' || github.event.label.name == 'review-again') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Review
+        uses: anthropics/claude-code-action@v1
+        continue-on-error: true
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are reviewing a pull request on this repo. Read AGENTS.md for the
+            team's conventions, then read the PR with `gh pr view` and its diff
+            with `gh pr diff`. Open the surrounding files when the diff alone is
+            not enough to judge a change.
+
+            Give AT MOST 2 recommendations: the two that matter most. Rank by
+            correctness bugs first, then security, then unhandled edge cases, then
+            maintainability. Do not raise formatting or style nits. Do not invent
+            a recommendation to fill a slot; if nothing is worth raising, say
+            "No recommendations. Looks good." and stop.
+
+            Format each recommendation as:
+
+            ### <n>. <short title>
+            **What:** the problem, citing file:line
+            **Why:** what goes wrong if it stays
+            **How to fix:** concrete steps, with a short code snippet where it helps
+
+            Post the whole review as ONE comment with `gh pr comment`. Do not
+            approve, request changes, or edit any file.
+          claude_args: |
+            --model claude-sonnet-5
+            --max-turns 20
+            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
+
+      # Clear the label so it can be added again to ask for the next review.
+      - name: Remove review-again label
+        if: ${{ always() && github.event.action == 'labeled' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label review-again --repo ${{ github.repository }}

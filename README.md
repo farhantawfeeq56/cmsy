@@ -133,6 +133,12 @@ non-zero on the first failure.
 | Tool | Description |
 | --- | --- |
 | `list_spaces` | Lists every space — a CMSy project, owning its own pages, components and design system. Read-only. |
+| `list_pages` | Lists one space's pages (id, title, slug, created). Takes the space slug from `list_spaces`. Read-only. |
+| `list_components` | Lists one space's components (name, description), and for an imported one, the component and space it came from. Takes the space slug. Read-only. |
+
+The per-space tools take a slug, not an id, so an agent can chain them straight off
+`list_spaces`. An unknown slug comes back as a tool error that says so, rather than an
+empty list.
 
 Tool definitions live in `mcp/server.ts`, deliberately free of Next.js
 imports so the same tools can later be served from a stdio process.

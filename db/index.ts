@@ -45,6 +45,8 @@ export type ActivityItem = {
 
 export type PageRow = { id: string; title: string; slug: string; created_at: string };
 
+export type PageDetail = Omit<PageRow, "created_at"> & { blocks: unknown };
+
 export type ComponentRow = {
   id: string;
   name: string;
@@ -115,6 +117,26 @@ export const listPages = (spaceId: string) =>
     where space_id = ${spaceId}
     order by created_at
   `);
+
+/** One page, by its slug within a space, including the document body. */
+export async function getPage(spaceId: string, slug: string) {
+  const found = await rows<PageDetail>(db()`
+    select id, title, slug, blocks
+    from pages
+    where space_id = ${spaceId} and slug = ${slug}
+    limit 1
+  `);
+  return found[0] ?? null;
+}
+
+/**
+ * The document lives in `blocks` as `{ html }`. An untouched page still holds
+ * the column default `[]`, so anything that is not a string body reads empty.
+ */
+export function pageHtml(blocks: unknown) {
+  const html = (blocks as { html?: unknown } | null)?.html;
+  return typeof html === "string" ? html : "";
+}
 
 export const listComponents = (spaceId: string) =>
   rows<ComponentRow>(db()`

@@ -172,6 +172,9 @@ body {
 /* The writing surface itself: one column, headings in Nohemi, body in Jakarta. */
 .doc { margin-top: 1.5rem; min-height: 60vh; outline: none; line-height: 1.7; overflow-wrap: break-word; }
 .doc > * + * { margin-top: 0.75rem; }
+/* The Design tab's preview draws the same template the page canvas does, so it
+   borrows the same type rules without the page's own layout. */
+.comp-preview { margin-top: 0; min-height: 0; }
 .doc h1, .doc h2, .doc h3 {
   font-family: var(--font-nohemi), Arial, sans-serif;
   font-weight: 400;
@@ -187,6 +190,8 @@ body {
 .doc li { margin: 0.25rem 0; }
 .doc blockquote { border-left: 2px solid var(--color-line); padding-left: 1rem; color: var(--color-smoke); }
 .doc a { color: var(--color-signal); text-decoration: underline; }
+/* A button is not a document link, so `.doc a` must not restyle one. */
+.doc .btn { color: var(--accent-ink); text-decoration: none; }
 .doc img { max-width: 100%; border-radius: 12px; }
 .doc code { border-radius: 4px; background: #1111110a; padding: 0.1rem 0.25rem; font-size: 0.875em; }
 .doc pre { border-radius: 8px; background: #1111110a; padding: 0.75rem 1rem; overflow-x: auto; font-size: 0.875rem; }

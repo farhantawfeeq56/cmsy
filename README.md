@@ -85,6 +85,22 @@ and `build`; to regenerate on its own:
 npm run design:sync
 ```
 
+DESIGN.md is also where each space's own design system **starts**. Design systems are per space
+(stored in `design_systems.tokens`, and a space can use another space's). A new space's system
+is seeded with DESIGN.md's token groups — `colors`, `typography`, `rounded`, `spacing`,
+`components` — and the database copy is canonical from then on; it is what the
+`get_design_system` MCP tool returns. The Design area still renders DESIGN.md itself rather than
+the space's tokens; moving it over is #48.
+
+Spaces created before seeding hold an empty or three-colour placeholder system. To give them
+DESIGN.md's tokens (a dry run unless `--apply` is passed; it writes to the `.env.local`
+database, which may be shared):
+
+```bash
+npm run db:seed-tokens
+npm run db:seed-tokens -- --apply
+```
+
 ## Running the MCP server
 
 The CMSy MCP server is served by the app itself, over Streamable HTTP at
@@ -135,6 +151,7 @@ non-zero on the first failure.
 | `list_spaces` | Lists every space — a CMSy project, owning its own pages, components and design system. Read-only. |
 | `list_pages` | Lists one space's pages (id, title, slug, created). Takes the space slug from `list_spaces`. Read-only. |
 | `list_components` | Lists one space's components (name, description), and for an imported one, the component and space it came from. Takes the space slug. Read-only. |
+| `get_design_system` | Returns the design system a space uses, with its full `tokens`, and which space owns it when it is shared. Takes the space slug. Read-only. |
 
 The per-space tools take a slug, not an id, so an agent can chain them straight off
 `list_spaces`. An unknown slug comes back as a tool error that says so, rather than an

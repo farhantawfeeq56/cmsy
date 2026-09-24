@@ -141,14 +141,40 @@ export const listImportable = (spaceId: string) =>
     order by s.name, c.name
   `);
 
+// Tokens are grouped (`colors`, `typography`, …), so a group counts its entries;
+// a bare top-level value, as older rows hold, counts as one.
 export const listDesignSystems = () =>
   rows<DesignSystem>(db()`
     select d.id, d.name, d.space_id, s.name as space_name,
-      (select count(*)::int from jsonb_object_keys(d.tokens)) as token_count
+      (select coalesce(sum(case jsonb_typeof(g.value)
+          when 'object' then (select count(*) from jsonb_object_keys(g.value))
+          else 1 end), 0)::int
+        from jsonb_each(d.tokens) g) as token_count
     from design_systems d
     left join spaces s on s.id = d.space_id
     order by d.created_at
   `);
+
+export type DesignSystemTokens = {
+  id: string;
+  name: string;
+  tokens: Record<string, unknown>;
+  owner_space_id: string | null;
+  owner_space_name: string | null;
+  owner_space_slug: string | null;
+};
+
+/** One design system with its tokens and the space that owns it. */
+export async function getDesignSystem(id: string) {
+  const [row] = await rows<DesignSystemTokens>(db()`
+    select d.id, d.name, d.tokens,
+      s.id as owner_space_id, s.name as owner_space_name, s.slug as owner_space_slug
+    from design_systems d
+    left join spaces s on s.id = d.space_id
+    where d.id = ${id}
+  `);
+  return row ?? null;
+}
 
 export type McpToken = {
   id: string;

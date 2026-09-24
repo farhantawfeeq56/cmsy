@@ -41,7 +41,8 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > `~DEFAULT_BRANCH`, `bypass_actors: []`) must match it. It refuses deletions and non-fast-forward
 > pushes, and requires a pull request that passes the two review lanes of §3.7:
 >
-> - **0 approving reviews** in general, so a fast-lane PR needs no approval (#77, #83);
+> - **1 approving review**: in the fast lane the review bot's Approve is enough; in the human lane
+>   it must be the other dev's (#83);
 > - **code-owner review**, so a PR touching a path in [`.github/CODEOWNERS`](.github/CODEOWNERS)
 >   needs the other dev's Approve, and **stale approvals are dismissed** on a new push;
 > - **required checks**, all pinned to GitHub Actions so nothing else can post them: `check` (CI),
@@ -286,14 +287,21 @@ which lane a PR is in, and what it is still missing.
 | | **Fast lane** | **Human lane** |
 |---|---|---|
 | Which PRs | Everything not listed in [`.github/CODEOWNERS`](.github/CODEOWNERS): app code, UI, tests, docs | Any PR touching a path in `CODEOWNERS`: `AGENTS.md`, `.github/`, `scripts/protection.mjs`, `db/schema.sql`, `db/migrate.mjs`, MCP auth (`mcp/tokens.ts`, `mcp/endpoint.ts`, `app/api/mcp/`), `wrangler.jsonc`, `package.json`, `package-lock.json` |
-| Review | The review bot comments; the author's agent addresses every point (fix it, or reply why not) | The same, **plus the other dev's Approve** on the head commit |
+| Review | The review bot reviews every push. It **approves** when it finds nothing that should block the merge; otherwise it comments, the author's agent fixes or answers each point, and the next push is reviewed again | The bot comments once, never approves. **The other dev's Approve** on the head commit is required |
 | Merge | Required checks green, then the author's human says go | The same |
 
-- **Why the split.** Most PRs are safe to ship on the bot's review, green checks and the author's
+- **Why the split.** Most PRs are safe to ship on the bot's Approve, green checks and the author's
   judgement, and waiting for a human there only slows both devs down. The human lane is the files
   that set the rules, change the production database, handle agent credentials or change what
   gets deployed. For those, the other dev has to know and agree before it ships, because `main`
   deploys straight to production.
+- **The bot's Approve is for the commit it read.** It approves that exact commit, and GitHub
+  dismisses the approval when new commits are pushed, so every push is reviewed again. The bot only
+  writes a verdict; the workflow approves, and only in the fast lane. It cannot approve a human-lane
+  PR in a way that counts, because GitHub's code-owner rule needs a `CODEOWNERS` owner.
+- **When the bot is wrong or down.** If it keeps withholding its Approve over a point you disagree
+  with, or it cannot run (usage limits, lapsed token), answer its point on the PR and ask the other
+  dev for an Approve instead. Do not edit the bot to get past it: `.github/` is human-lane work.
 - **A human-lane Approve must say what was checked.** Write one line or more in the review body.
   `review-lane` does not count an empty Approve, an Approve on an older commit, or the author's
   own. GitHub also dismisses an approval when new commits are pushed, so re-approve after changes.
@@ -314,10 +322,11 @@ which lane a PR is in, and what it is still missing.
 
 - **Check before you merge, every time:**
   ```bash
-  gh pr view <number> --json statusCheckRollup,author,comments
+  gh pr view <number> --json statusCheckRollup,reviewDecision,author,comments
   ```
   Every check must pass, `review-lane` included (it covers the approval in the human lane and any
-  change request in either lane), and `author` must not be you. Every review-bot point must be
+  change request in either lane). `reviewDecision` must be `APPROVED`: the bot's Approve in the
+  fast lane, the other dev's in the human lane. `author` must not be you. Every review-bot point must be
   fixed or answered. Your human must also have told you to merge this PR. If any of these fails,
   stop and say which one.
 - Prefer **squash merge** so `main` history stays one commit per issue (title follows the PR title format).
@@ -388,7 +397,7 @@ A ticket is done only when:
 - [ ] Tests written/updated and passing; CI is green
 - [ ] Lint/format clean
 - [ ] Docs updated where relevant
-- [ ] Review-bot points fixed or answered; for a human-lane PR, the other dev's **Approve** with a note on what they checked (`review-lane` green)
+- [ ] Review-bot points fixed or answered; approved (`reviewDecision: APPROVED`): by the review bot in the fast lane, by the other dev with a note on what they checked in the human lane (`review-lane` green)
 - [ ] Merged to `main` via PR (squash), branch deleted
 - [ ] Issue is closed and its card is **Done**; follow-ups are filed
 
@@ -404,7 +413,7 @@ A ticket is done only when:
 5. Test + lint locally
 6. git push -u origin <branch>  →  open PR (template, "Closes #<number>")
 7. Board → In Review + PR link
-8. Bot review, fix; human lane: other dev approves with a note
+8. Fast lane: bot approves (fix and push until it does); human lane: other dev approves with a note
 9. Human merges (squash)  →  issue closed, card Done
 ```
 

@@ -206,6 +206,7 @@ describe("driftFrom", () => {
       },
     ];
     expect(driftFrom(spec, today, "active")).toEqual([
+      "pull_request: required_approving_review_count is 0, spec says 1",
       "pull_request: require_code_owner_review is false, spec says true",
       "pull_request: dismiss_stale_reviews_on_push is false, spec says true",
       "required_status_checks: missing on main",

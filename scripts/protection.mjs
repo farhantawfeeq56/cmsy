@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Enforces the two review lanes on main (#83). See AGENTS.md §3.7.
 //
-//   node scripts/protection.mjs lane --pr 42   # may PR #42 merge, as far as review goes?
-//   node scripts/protection.mjs drift          # do main's live rules match the checked-in spec?
+//   node scripts/protection.mjs lane --pr 42      # may PR #42 merge, as far as review goes?
+//   node scripts/protection.mjs lane-of --pr 42   # prints "fast" or "human", nothing else
+//   node scripts/protection.mjs drift             # do main's live rules match the checked-in spec?
 //
 // `lane` puts a PR in the human lane when it touches a path listed in
 // .github/CODEOWNERS, read from the PR's base branch so a PR cannot edit itself
@@ -203,7 +204,7 @@ function readCodeowners(name, ref) {
   }
 }
 
-function lane(prNumber) {
+function verdictFor(prNumber) {
   const name = repo();
   const pr = api(`repos/${name}/pulls/${prNumber}`);
   const files = apiAll(`repos/${name}/pulls/${prNumber}/files?per_page=100`).flatMap((f) =>
@@ -214,20 +215,23 @@ function lane(prNumber) {
   // The base branch's CODEOWNERS decides, as it does for GitHub. Only when the
   // base has none (the PR that first adds it) does the PR's own copy stand in.
   const text = readCodeowners(name, pr.base.sha) ?? readCodeowners(name, pr.head.sha) ?? "";
-  const verdict = laneVerdict({
+  return laneVerdict({
     author: pr.user.login,
     headSha: pr.head.sha,
     files,
     reviews,
     rules: parseCodeowners(text),
   });
+}
 
+function lane(prNumber) {
+  const verdict = verdictFor(prNumber);
   summary([
     `### Review lane: ${verdict.lane}`,
     "",
     verdict.lane === "human"
       ? `Human-lane files:\n${verdict.guarded.map((f) => `- \`${f}\``).join("\n")}`
-      : "No file here is listed in `.github/CODEOWNERS`, so no approval is needed.",
+      : "No file here is listed in `.github/CODEOWNERS`, so this is the fast lane: the review bot's approval is enough.",
     "",
     verdict.ok ? "Review requirements are met." : verdict.problems.map((p) => `- ${p}`).join("\n"),
   ]);
@@ -279,8 +283,13 @@ function drift() {
 function main(argv) {
   const [command, flag, value] = argv;
   if (command === "drift") return drift();
-  if (command === "lane" && flag === "--pr" && /^\d+$/.test(value ?? "")) return lane(Number(value));
-  console.error("Usage: node scripts/protection.mjs lane --pr <number> | drift");
+  const pr = flag === "--pr" && /^\d+$/.test(value ?? "") ? Number(value) : null;
+  if (command === "lane" && pr) return lane(pr);
+  if (command === "lane-of" && pr) {
+    console.log(verdictFor(pr).lane);
+    return 0;
+  }
+  console.error("Usage: node scripts/protection.mjs lane --pr <number> | lane-of --pr <number> | drift");
   return 2;
 }
 

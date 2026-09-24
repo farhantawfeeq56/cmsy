@@ -2,9 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
-// Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
-import design from "./[space]/design.generated.json";
+import {
+  createComponent as insertComponent,
+  createSpace as insertSpace,
+  db,
+  deleteComponent as removeComponent,
+  importComponent as copyComponent,
+  insertWithSlug,
+  LIMITS,
+  slugify,
+} from "@/db";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -18,57 +25,20 @@ function uuid(value: FormDataEntryValue | null) {
   return UUID.test(raw) ? raw : null;
 }
 
-function slugify(value: string) {
-  const slug = value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-  return slug || "untitled";
-}
-
-/**
- * Inserts with a collision-free slug: `on conflict do nothing` returns no row,
- * so we retry with a numeric suffix. Race-safe because the unique index decides.
- */
-async function insertWithSlug(
-  run: (slug: string) => PromiseLike<Record<string, unknown>[]>,
-  base: string,
-): Promise<{ id: string } | null> {
-  for (let attempt = 1; attempt <= 50; attempt++) {
-    const [row] = await run(attempt === 1 ? base : `${base}-${attempt}`);
-    if (row) return row as { id: string };
-  }
-  return null;
-}
-
 const refresh = () => revalidatePath("/dashboard", "layout");
 
 /** ~200KB of HTML is already a very long page; the cap bounds a hostile save. */
 const MAX_BODY = 200_000;
 
 export async function createSpace(formData: FormData) {
-  const name = text(formData.get("name"), 80);
+  const name = text(formData.get("name"), LIMITS.spaceName);
   if (!name) return;
 
-  const base = slugify(name);
-  const row = await insertWithSlug(
-    (slug) => db()`insert into spaces (name, slug) values (${name}, ${slug})
-      on conflict (slug) do nothing returning id`,
-    base,
-  );
+  const row = await insertSpace(name);
   if (!row) return;
 
-  // A space starts with its own design system, seeded from DESIGN.md's tokens,
-  // which it can later edit or swap for another space's.
-  const [designSystem] = (await db()`
-    insert into design_systems (space_id, name, tokens)
-    values (${row.id}, ${`${name} design system`}, ${JSON.stringify(design.tokens)}::jsonb)
-    returning id`) as { id: string }[];
-  await db()`update spaces set design_system_id = ${designSystem.id} where id = ${row.id}`;
-
   refresh();
-  redirect(`/dashboard/${base}`);
+  redirect(`/dashboard/${slugify(name)}`);
 }
 
 export async function createPage(formData: FormData) {
@@ -120,13 +90,10 @@ export async function deletePage(formData: FormData) {
 
 export async function createComponent(formData: FormData) {
   const spaceId = uuid(formData.get("spaceId"));
-  const name = text(formData.get("name"), 80);
+  const name = text(formData.get("name"), LIMITS.componentName);
   if (!spaceId || !name) return;
 
-  const description = text(formData.get("description"), 300);
-  await db()`insert into components (space_id, name, description)
-    values (${spaceId}, ${name}, ${description})
-    on conflict (space_id, name) do nothing`;
+  await insertComponent(spaceId, name, text(formData.get("description"), LIMITS.componentDescription));
   refresh();
 }
 
@@ -136,11 +103,7 @@ export async function importComponent(formData: FormData) {
   const componentId = uuid(formData.get("componentId"));
   if (!spaceId || !componentId) return;
 
-  await db()`insert into components (space_id, name, description, origin_component_id)
-    select ${spaceId}, name, description, id
-    from components
-    where id = ${componentId} and space_id <> ${spaceId}
-    on conflict (space_id, name) do nothing`;
+  await copyComponent(spaceId, componentId);
   refresh();
 }
 
@@ -149,7 +112,7 @@ export async function deleteComponent(formData: FormData) {
   const spaceId = uuid(formData.get("spaceId"));
   if (!id || !spaceId) return;
 
-  await db()`delete from components where id = ${id} and space_id = ${spaceId}`;
+  await removeComponent(spaceId, id);
   refresh();
 }
 

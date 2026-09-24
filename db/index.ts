@@ -1,4 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+// Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
+import design from "../app/dashboard/[space]/design.generated.json";
 
 type Client = NeonQueryFunction<false, false>;
 let client: Client | null = null;
@@ -151,8 +153,8 @@ export const listComponents = (spaceId: string) =>
 
 /** Components from other spaces this space has not imported yet. */
 export const listImportable = (spaceId: string) =>
-  rows<{ id: string; name: string; space_name: string }>(db()`
-    select c.id, c.name, s.name as space_name
+  rows<{ id: string; name: string; space_name: string; space_slug: string }>(db()`
+    select c.id, c.name, s.name as space_name, s.slug as space_slug
     from components c
     join spaces s on s.id = c.space_id
     where c.space_id <> ${spaceId}
@@ -162,6 +164,107 @@ export const listImportable = (spaceId: string) =>
       )
     order by s.name, c.name
   `);
+
+/**
+ * Writes shared by the dashboard's server actions and the MCP tools, so the two
+ * cannot drift: each caller validates its own input shape, and the SQL lives
+ * here once. The limits are the dashboard form's, applied by both callers.
+ */
+export const LIMITS = { spaceName: 80, componentName: 80, componentDescription: 300 };
+
+export function slugify(value: string) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return slug || "untitled";
+}
+
+/**
+ * Inserts with a collision-free slug: `on conflict do nothing` returns no row,
+ * so we retry with a numeric suffix. Race-safe because the unique index decides.
+ * Returns the slug that was actually used, which differs from `base` on a clash.
+ */
+export async function insertWithSlug(
+  run: (slug: string) => PromiseLike<Row[]>,
+  base: string,
+): Promise<{ id: string; slug: string } | null> {
+  for (let attempt = 1; attempt <= 50; attempt++) {
+    const slug = attempt === 1 ? base : `${base}-${attempt}`;
+    const [row] = await run(slug);
+    if (row) return { id: row.id as string, slug };
+  }
+  return null;
+}
+
+/** A new space, with its own design system selected. Null when no slug is free. */
+export async function createSpace(name: string) {
+  const row = await insertWithSlug(
+    (slug) => db()`insert into spaces (name, slug) values (${name}, ${slug})
+      on conflict (slug) do nothing returning id`,
+    slugify(name),
+  );
+  if (!row) return null;
+
+  // A space starts with its own design system, seeded from DESIGN.md's tokens,
+  // which it can later edit or swap for another space's.
+  const [designSystem] = await rows<{ id: string }>(db()`
+    insert into design_systems (space_id, name, tokens)
+    values (${row.id}, ${`${name} design system`}, ${JSON.stringify(design.tokens)}::jsonb)
+    returning id`);
+  await db()`update spaces set design_system_id = ${designSystem.id} where id = ${row.id}`;
+  return row;
+}
+
+/** Null when the space already has a component with that name. */
+export async function createComponent(
+  spaceId: string,
+  name: string,
+  description: string,
+): Promise<{ id: string } | null> {
+  const [row] = await rows<{ id: string }>(db()`
+    insert into components (space_id, name, description)
+    values (${spaceId}, ${name}, ${description})
+    on conflict (space_id, name) do nothing
+    returning id`);
+  return row ?? null;
+}
+
+/**
+ * Copies a component from another space, keeping a link to where it came from.
+ * Null when the source is in the same space or the name is already taken here.
+ */
+export async function importComponent(
+  spaceId: string,
+  componentId: string,
+): Promise<{ id: string; name: string } | null> {
+  const [row] = await rows<{ id: string; name: string }>(db()`
+    insert into components (space_id, name, description, origin_component_id)
+    select ${spaceId}, name, description, id
+    from components
+    where id = ${componentId} and space_id <> ${spaceId}
+    on conflict (space_id, name) do nothing
+    returning id, name`);
+  return row ?? null;
+}
+
+/** False when no such component exists in that space. */
+export async function deleteComponent(spaceId: string, id: string) {
+  const deleted = await rows<{ id: string }>(db()`
+    delete from components where id = ${id} and space_id = ${spaceId} returning id`);
+  return deleted.length > 0;
+}
+
+/** Component names are unique per space, so a name identifies one. */
+export async function findComponent(
+  spaceId: string,
+  name: string,
+): Promise<{ id: string; name: string } | null> {
+  const [row] = await rows<{ id: string; name: string }>(db()`
+    select id, name from components where space_id = ${spaceId} and name = ${name}`);
+  return row ?? null;
+}
 
 // Tokens are grouped (`colors`, `typography`, …), so a group counts its entries;
 // a bare top-level value, as older rows hold, counts as one.

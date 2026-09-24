@@ -24,8 +24,8 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 
 | Item | Value |
 |---|---|
-| Repo | `farhantawfeeq56/cmsy` (**private** — unauthenticated API calls return 404) |
-| Default branch | `main` — **not yet protected**, see note below |
+| Repo | `farhantawfeeq56/cmsy` (**public** — unauthenticated API calls return 200) |
+| Default branch | `main` — protected by the `main-protection` ruleset, see note below |
 | Issue tracker | **GitHub Issues** on this repo (issues look like `#42`) — see §0.1 |
 | Project board | [`cmsy`](https://github.com/users/AathilFelix/projects/1) — a Projects v2 board carrying the Status and Priority fields. Owned by `@AathilFelix`; see §0.1 |
 | Dev A / agent | Aathil Felix C — `@AathilFelix` / Claude Code |
@@ -36,13 +36,29 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 | Test | `npm test` (Vitest, run once) or `npm run test:watch`. Tests live next to the code as `*.test.ts`, run in Node rather than workerd, and stub the database — never point one at the shared Neon project (rule 9). |
 | Lint / format | `npm run lint` (ESLint 9 + `eslint-config-next`) |
 
-> **`main` is protected.** The repo was made public on 2026-09-24, which is what the Free plan
-> required — on a private repo owned by a personal account, `GET /repos/.../rulesets` answers
-> `403 "Upgrade to GitHub Pro or make this repository public to enable this feature."`
-> `GET /repos/farhantawfeeq56/cmsy/branches/main` now reports `"protected": true`, with a
-> required pull request and **1 approving review**, and force pushes and deletions refused.
-> Merging is enforced by GitHub; the agent never presses the
-> button, approval or not. See #23.
+> **`main` is protected, and the protection is enforced.** A ruleset named `main-protection`
+> (id `23748284`, targets `~DEFAULT_BRANCH`) has been on **Active** enforcement since
+> 2026-09-24, with `bypass_actors: []`, so no one — admin included — can bypass it. It refuses
+> deletions and non-fast-forward pushes, and requires a pull request with **1 approving review**.
+>
+> Check it rather than trust it, because it has been wrong before:
+>
+> ```bash
+> gh api repos/farhantawfeeq56/cmsy/rulesets                    # "enforcement": "active"
+> gh api repos/farhantawfeeq56/cmsy/rules/branches/main         # deletion, non_fast_forward, pull_request
+> ```
+>
+> `GET /branches/main` reporting `"protected": true` only means *a ruleset targets the branch*.
+> On 2026-09-21 the ruleset was created while the repo was private — when the Free plan could not
+> enforce rulesets — and left on `disabled` while #23 was closed on the assumption it worked.
+> That is #71; use `rules/branches/main` above, not `branches/main`, to check.
+>
+> The repo is public (since 2026-09-24), which is what the Free plan requires for enforceable
+> rulesets on a personal account.
+>
+> **No status check is required yet**, so a red CI run does not block a merge by itself. Review
+> still has to pass on its own merits. Merging is enforced by GitHub; the agent never presses the
+> button, approval or not.
 
 You act **on behalf of your human owner**. They approve anything risky, ambiguous, or irreversible.
 

@@ -137,7 +137,7 @@ describe("create_component", () => {
       template: '<h2 class="title">{{heading}}</h2>',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/class is not kept on <h2>/);
+    expect(result.content[0].text).toMatch(/class "title" is not kept on <h2>/);
     expect(db.createComponent).not.toHaveBeenCalled();
   });
 

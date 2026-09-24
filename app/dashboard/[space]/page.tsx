@@ -239,9 +239,11 @@ function ComponentPreview({ props, template }: { props: Prop[]; template: string
 
   // Safe by construction: renderComponent returns nothing unless the template
   // passed the page allowlist, and it escapes every value it substitutes.
+  // `doc comp-preview` because this is the same markup a page canvas renders:
+  // the type rules come from `.doc`, the page's own layout from `.comp-preview`.
   return (
     <div
-      className="w-full max-w-55"
+      className="doc comp-preview w-full max-w-55"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

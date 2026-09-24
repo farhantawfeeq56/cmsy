@@ -41,6 +41,55 @@ export const STYLE_PROPERTIES = new Set([
   "text-align", "color",
 ]);
 
+/**
+ * The class names a document may carry — the design system a template reaches.
+ *
+ * `class` is in no entry of `TAGS`, so the only classes a stored document
+ * could hold were the two `sanitize` writes itself (`.badge`, `.comp-field`).
+ * That left a component template able to express type and nothing else:
+ * DESIGN.md's Card, Primary button and Badges are fills, borders and radii, and
+ * not one of those is a declaration `STYLE_PROPERTIES` keeps.
+ *
+ * So the vocabulary is named here instead, and the values stay in
+ * `app/globals.css` where the design system owns them. It is deliberately
+ * short — only the primitives that already exist there and that content may
+ * legitimately be built from. Adding one is a design-system decision, which is
+ * why it is a list rather than `STYLE_PROPERTIES` opened up to `background`.
+ */
+export const CLASSES = new Set([
+  "card",
+  "btn",
+  "btn-quiet",
+  "badge",
+  "badge-quiet",
+  "label",
+]);
+
+/**
+ * Which of a `class` attribute's tokens survive `sanitize`, in order.
+ *
+ * One copy, read by the checker and by `clean`, because the two disagreeing is
+ * the failure this module exists to prevent: accepting a class the editor
+ * strips means reporting a save that quietly lost it.
+ *
+ * `island` and `earned` keep the two names `sanitize` writes itself, on the two
+ * shapes that earn them, so a document it produced passes back through
+ * unchanged. A template cannot reach those two: it is never an island, and it
+ * carries no `data-field` for `clean` to award a `.comp-field` to.
+ */
+export const keptClasses = (
+  value: string,
+  context: { island: boolean; inIsland: boolean; earned: boolean },
+): string[] =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((token) => {
+      if (CLASSES.has(token)) return true;
+      if (context.island) return token === "comp-block";
+      return context.inIsland && context.earned && token === "comp-field";
+    });
+
 /** Anything without a scheme is fine (relative paths, `#anchors`). */
 export const unsafeUrl = (value: string) =>
   /^\s*(?:javascript|vbscript|data|file):/i.test(value.replace(/[\u0000-\u001f]/g, ""));
@@ -107,21 +156,6 @@ const isIsland = (tag: string, attrs: Map<string, string>) =>
   attrs.get("data-block") === "component" &&
   UUID.test(attrs.get("data-component-id") ?? "") &&
   parseValues(attrs.get("data-values") ?? null) !== null;
-
-/**
- * `class` and `contenteditable` are not in `TAGS` for any tag, because
- * `sanitize` writes them itself rather than passing them through — and only
- * onto two shapes: the island `<div>` itself, and an element inside one that
- * carries the attribute that earns it a `.badge` or a `.comp-field`. Being
- * permissive here instead would accept `<p class="callout">`, which `sanitize`
- * does strip, so `set_page_blocks` would report a save that silently lost it.
- */
-function keepsGenerated(key: string, island: boolean, inIsland: boolean, attrs: Map<string, string>) {
-  if (key === "contenteditable") return island;
-  if (key !== "class") return false;
-  if (island) return true;
-  return inIsland && (attrs.has("data-block-name") || attrs.has("data-field"));
-}
 
 /**
  * What in `html` the editor would not keep, as one line per problem. Empty
@@ -195,11 +229,24 @@ export function pageHtmlProblems(html: string): string[] {
             problems.add(`style property "${property}" is not kept`);
           }
         }
+      } else if (key === "class") {
+        const kept = keptClasses(value, {
+          island,
+          inIsland,
+          earned: attrs.has("data-block-name") || attrs.has("data-field"),
+        });
+        // One problem per token, the way the style branch above reports one per
+        // declaration. Joining them would name a class that never existed —
+        // `class="callout accent"` would come back as one class, "callout
+        // accent", which is a name nobody can act on.
+        for (const token of value.split(/\s+/).filter(Boolean)) {
+          if (!kept.includes(token)) problems.add(`class "${token}" is not kept on <${rawTag}>`);
+        }
       } else if (allowed.includes(key)) {
         if ((key === "href" || key === "src") && unsafeUrl(value)) {
           problems.add(`${key}="${value}" is not a safe link and would be removed`);
         }
-      } else if (!keepsGenerated(key, island, inIsland, attrs)) {
+      } else if (!(key === "contenteditable" && island)) {
         problems.add(`${key} is not kept on <${rawTag}>`);
       }
     }

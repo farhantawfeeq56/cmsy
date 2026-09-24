@@ -49,21 +49,44 @@ describe("pageHtmlProblems", () => {
   // The island allowance is not blanket. These are exactly the shapes
   // `sanitize` strips `class` and `contenteditable` from, so accepting them
   // would mean reporting a save that had quietly lost an attribute.
-  it("reports class on an element that is not a component island", () => {
+  it("reports a class that is not part of the design system", () => {
     expect(pageHtmlProblems('<p class="callout">Note</p>')).toEqual([
-      "class is not kept on <p>",
+      'class "callout" is not kept on <p>',
+    ]);
+  });
+
+  it("names only the tokens a mixed class list loses", () => {
+    expect(pageHtmlProblems('<div class="card callout">Tier</div>')).toEqual([
+      'class "callout" is not kept on <div>',
+    ]);
+  });
+
+  it("reports each lost token separately, not glued into one bogus name", () => {
+    expect(pageHtmlProblems('<div class="callout accent card">Tier</div>')).toEqual([
+      'class "callout" is not kept on <div>',
+      'class "accent" is not kept on <div>',
+    ]);
+  });
+
+  it("keeps the design system's classes with no island around them", () => {
+    // A component template is judged on its own, so `card`, `btn` and `badge`
+    // have to survive without the block that would normally carry them.
+    const tier =
+      '<div class="card"><span class="badge">Popular</span><a class="btn" href="/signup">Go</a></div>';
+    expect(pageHtmlProblems(tier)).toEqual([]);
+  });
+
+  it("reports a class only an island can earn", () => {
+    // `comp-field` is `sanitize`'s own, written on a `data-field` span inside a
+    // block; loose, it would render as a labelled field with no label.
+    expect(pageHtmlProblems('<span class="comp-field">New</span>')).toEqual([
+      'class "comp-field" is not kept on <span>',
     ]);
   });
 
   it("reports contenteditable outside a component island", () => {
     expect(pageHtmlProblems('<h2 contenteditable="true">Title</h2>')).toEqual([
       "contenteditable is not kept on <h2>",
-    ]);
-  });
-
-  it("reports class on a stray span no island would claim", () => {
-    expect(pageHtmlProblems('<span class="badge">New</span>')).toEqual([
-      "class is not kept on <span>",
     ]);
   });
 

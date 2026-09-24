@@ -67,6 +67,19 @@ describe("componentProblems", () => {
     expect(componentProblems(HERO, TEMPLATE)).toEqual([]);
   });
 
+  it("passes a template built from the design system's own classes", () => {
+    const template =
+      '<div class="card"><h3>{{heading}}</h3><span class="badge">Popular</span>' +
+      '<a class="btn" href="/signup">{{cta}}</a></div>';
+    expect(componentProblems(HERO, template)).toEqual([]);
+  });
+
+  it("reports a class the design system does not have, rather than losing it on save", () => {
+    expect(componentProblems(HERO, '<h2 class="title">{{heading}}</h2>')).toEqual([
+      'class "title" is not kept on <h2>',
+    ]);
+  });
+
   it("reports a template tag the page would not keep", () => {
     expect(componentProblems([], "<marquee>{{x}}</marquee>")).toEqual([
       "<marquee> is not part of a page document, so only its contents would be kept",

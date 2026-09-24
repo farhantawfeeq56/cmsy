@@ -24,7 +24,7 @@ import {
 } from "../db";
 // The leaf module, not `../db`: it is pure and import-free, so a test that
 // replaces the database functions still exercises the real checker.
-import { pageHtmlProblems } from "../db/page-html";
+import { CLASSES, pageHtmlProblems } from "../db/page-html";
 // Also import-free, so a template is judged by the same rules the editor
 // enforces rather than by a second copy of them.
 import {
@@ -487,7 +487,8 @@ const componentTemplate = z
   .max(PROP_LIMITS.template)
   .describe(
     "HTML that renders the props, with {{key}} in text — never inside a tag. " +
-      "Only the tags a page document allows survive, and no class.",
+      "Only the tags a page document allows survive, plus the design system's " +
+      `own classes (${[...CLASSES].join(", ")}) and no others.`,
   );
 
 /** What a write left stored, so a caller can see it without a read tool. */

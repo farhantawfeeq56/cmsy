@@ -13,7 +13,7 @@
  */
 
 import { propValues, renderComponent, type Prop } from "@/db/component-template";
-import { DROP, esc, parseValues, STYLE_PROPERTIES, TAGS, unsafeUrl } from "@/db/page-html";
+import { DROP, esc, keptClasses, parseValues, STYLE_PROPERTIES, TAGS, unsafeUrl } from "@/db/page-html";
 
 // Re-exported because the editor has always reached for these through `./doc`,
 // and where they are defined is not the editor's business.
@@ -31,6 +31,17 @@ function clean(root: HTMLElement) {
       continue;
     }
 
+    // A component block is recognised by shape, never by an attribute a paste
+    // could set: a plausible block becomes one, anything else is a plain div.
+    // Read before the attributes are filtered, because the class allowlist and
+    // the `contenteditable` below both depend on it.
+    const island =
+      el.tagName === "DIV" &&
+      el.getAttribute("data-block") === "component" &&
+      UUID.test(el.getAttribute("data-component-id") ?? "") &&
+      parseValues(el.getAttribute("data-values")) !== null;
+    const inIsland = Boolean(el.parentElement?.closest(".comp-block"));
+
     for (const { name, value } of [...el.attributes]) {
       if (name === "style") {
         const kept = value
@@ -40,6 +51,16 @@ function clean(root: HTMLElement) {
           .map((parts) => parts.join(":"));
         if (kept.length) el.setAttribute("style", kept.join(";"));
         else el.removeAttribute("style");
+      } else if (name === "class") {
+        // The design system's own names survive; everything else is stripped,
+        // exactly as `pageHtmlProblems` reports it (`@/db/page-html`).
+        const kept = keptClasses(value, {
+          island,
+          inIsland,
+          earned: el.hasAttribute("data-block-name") || el.hasAttribute("data-field"),
+        });
+        if (kept.length) el.setAttribute("class", kept.join(" "));
+        else el.removeAttribute("class");
       } else if (!allowed.includes(name)) {
         el.removeAttribute(name);
       } else if ((name === "href" || name === "src") && unsafeUrl(value)) {
@@ -47,10 +68,8 @@ function clean(root: HTMLElement) {
       }
     }
 
-    // Component blocks are recognised by shape, never by an attribute a paste
-    // could set: a plausible block becomes one, anything else is a plain div.
     if (el.tagName === "DIV" && el.getAttribute("data-block") === "component") {
-      if (UUID.test(el.getAttribute("data-component-id") ?? "") && parseValues(el.getAttribute("data-values"))) {
+      if (island) {
         el.setAttribute("contenteditable", "false");
         el.classList.add("comp-block");
       } else {
@@ -63,7 +82,7 @@ function clean(root: HTMLElement) {
     }
     // A block's own markup, and only inside a block: a pasted `<span data-field>`
     // must not render as if it were an editable component field.
-    if (el.parentElement?.closest(".comp-block")) {
+    if (inIsland) {
       if (el.getAttribute("data-block-name") !== null) el.classList.add("badge");
       if (el.getAttribute("data-field") !== null) el.classList.add("comp-field");
     } else if (el.tagName === "SPAN") {

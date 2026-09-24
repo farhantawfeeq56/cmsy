@@ -71,6 +71,20 @@ This makes it possible to move from:
 Design / Edit → Structured instruction → Agent → Codebase
 ```
 
+## Design system
+
+A space's visual rules live in [`DESIGN.md`](./DESIGN.md) — colours, type scale, radii and the
+guidelines prose. The Design area of a space renders that file, so editing DESIGN.md *is* how
+you change the design system; there is nothing to keep in sync by hand.
+
+`scripts/sync-design.mjs` turns it into `app/dashboard/[space]/design.generated.json`, which is
+committed so both bundlers can import it without a loader. It runs automatically before `dev`
+and `build`; to regenerate on its own:
+
+```bash
+npm run design:sync
+```
+
 ## Running the MCP server
 
 The CMSy MCP server is served by the app itself, over Streamable HTTP at

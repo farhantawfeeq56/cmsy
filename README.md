@@ -166,10 +166,22 @@ non-zero on the first failure.
 | `list_pages` | Lists one space's pages (id, title, slug, created). Takes the space slug from `list_spaces`. Read-only. |
 | `list_components` | Lists one space's components (name, description), and for an imported one, the component and space it came from. Takes the space slug. Read-only. |
 | `get_design_system` | Returns the design system a space uses, with its full `tokens`, and which space owns it when it is shared. Takes the space slug. Read-only. |
+| `get_space` | One space by slug: name, page and component counts, design system name. Read-only. |
+| `list_importable` | Components in other spaces this space has not imported yet, with the space each lives in. Read-only. |
+| `list_recent_activity` | The newest pages and components across all spaces (`limit`, default 5, max 50). Read-only. |
+| `create_space` | Creates a space with its own design system. Returns the slug actually used, which gets a suffix if the name's slug is taken. |
+| `create_component` | Adds a component (`name`, optional `description`) to a space. |
+| `import_component` | Copies a component (`component` name in `fromSpace`) into a space, keeping a link to the original. |
+| `delete_component` | Deletes a component from a space by name. Destructive. |
 
 The per-space tools take a slug, not an id, so an agent can chain them straight off
-`list_spaces`. An unknown slug comes back as a tool error that says so, rather than an
-empty list.
+`list_spaces`, and components are named rather than id'd because a name is unique within
+a space. An unknown slug, a missing component or a name that is already taken comes back
+as a tool error that says so, rather than an empty list or a silent no-op.
+
+The write tools run the same functions in `db/index.ts` as the dashboard's server actions,
+with the same length limits, so the two cannot drift. Like the dashboard, they are only as
+protected as `/api/mcp` itself: loopback needs no token (see Auth below).
 
 Tool definitions live in `mcp/server.ts`, deliberately free of Next.js
 imports so the same tools can later be served from a stdio process.

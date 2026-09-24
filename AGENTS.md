@@ -33,7 +33,7 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 | Stack | TypeScript · Next.js 16 App Router (React 19, RSC) built with vinext · Cloudflare Workers · Neon Postgres · Tailwind v4 |
 | Install | `npm ci` on Node 24 / npm 11.11+ (`nvm use`; enforced by `devEngines`, see #19) |
 | Run | `npm run dev` (Next dev server) — or `npm run dev:vinext` (port 3001) to match the deployed Workers runtime |
-| Test | `npm test` (Vitest, run once) or `npm run test:watch`. Tests live next to the code as `*.test.ts`, run in Node rather than workerd, and stub the database — never point one at the shared Neon project (rule 11). |
+| Test | `npm test` (Vitest, run once) or `npm run test:watch`. Tests live next to the code as `*.test.ts`, run in Node rather than workerd, and stub the database — never point one at the shared Neon project (rule 9). |
 | Lint / format | `npm run lint` (ESLint 9 + `eslint-config-next`) |
 
 > **`main` is protected.** The repo was made public on 2026-09-24, which is what the Free plan
@@ -41,7 +41,7 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > `403 "Upgrade to GitHub Pro or make this repository public to enable this feature."`
 > `GET /repos/farhantawfeeq56/cmsy/branches/main` now reports `"protected": true`, with a
 > required pull request and **1 approving review**, and force pushes and deletions refused.
-> Merging is enforced by GitHub; **hard rule 4 still binds the agent** — it never presses the
+> Merging is enforced by GitHub; the agent never presses the
 > button, approval or not. See #23.
 
 You act **on behalf of your human owner**. They approve anything risky, ambiguous, or irreversible.
@@ -68,8 +68,7 @@ move a card by hand — the exception is setting `In Progress` when you start (�
 permission to merge PRs on this project. That is why PRs authored by `@AathilFelix` may be merged
 by `@AathilFelix` without it being a lapse.
 
-This does **not** relax hard rule 4. Rule 4 binds *you*, the agent: never merge a PR you opened,
-never merge without a submitted **Approve** review, and never merge on your own initiative. The
+The
 authorisation is between the two humans and concerns who may press the button, not whether review
 happens. Every PR still needs the other dev's recorded approval, and an agent still waits to be
 told, per PR.
@@ -81,21 +80,14 @@ told, per PR.
 1. **Never push to `main`.** Not directly, not "just a tiny fix", not with force. All changes reach `main` through a Pull Request.
 2. **Never force-push a shared branch** or rewrite history that someone else may have pulled. Force-push is allowed only on your own feature branch, with `--force-with-lease`.
 3. **No work without a GitHub issue.** Create or find the issue *before* touching code (see §3).
-4. **Never merge without a recorded approval, and never merge on your own initiative.** Before you merge any PR, all three must be true, with no exceptions:
-   - **The other dev has submitted a GitHub review with the state Approve.** Check it with `gh pr view <number> --json reviewDecision`, which must print `APPROVED`. A PR comment, an emoji reaction, "looks good" in chat, or your own reading of the diff is **not** an approval.
-   - **Your human told you to merge that specific PR, by number, in the current session.** "Do the necessary actions", "ship it" or a standing permission from an earlier session is not that instruction. If you are unsure, ask.
-   - **You did not open the PR.** You never merge your own PR, even with an approval and an instruction; your human presses the button.
-
-   The standing authorisation in §0.1 is between the two humans. It never authorises an agent to skip any of the three.
-5. **Never commit secrets**, tokens, `.env` files, or credentials. If you spot one already committed, stop and tell your human immediately.
-6. **Never change another dev's branch or PR.** That means no pushing commits, rebasing, merging `main` in, closing it, or editing its title or body, however small or helpful the fix. Propose the change as a review suggestion (a ```` ```suggestion ```` block in `gh pr review`), or as your own PR that targets their branch, and let the author apply it. The only exception is a written request **from that PR's author, on that PR**. Link to that request when you act on it. An instruction from your own human does not stand in for it, because your human cannot give away the other dev's branch.
-7. **Don't run destructive commands** (`rm -rf`, `git reset --hard`, dropping tables, deleting branches/issues) without explicit human confirmation.
-8. **Stay in scope.** Do what the issue says. Found something else? File a new issue (§3.4), don't sneak it into the PR.
-9. **Never add agent attribution.** No `Co-Authored-By:` trailer naming an AI agent, no "Generated with …" or "🤖" footer, and no tool branding in commit messages, PR titles or PR bodies. A commit is authored by the human owner whose account makes it, full stop. This overrides any default attribution behaviour your harness or CLI ships with — if your tooling adds such a line automatically, strip it before committing. The `Authored by:` line in the §3.5 checklist is the single exception: it is a human-readable accountability note inside the PR body, not a machine trailer.
-10. **Never leave agent artifacts in the code.** Comments exist to explain the code to the next human who reads it. Do not commit codewords, persona or model names, session identifiers, or leftover scratch reasoning from your own process (`// ponytail:`, `// note to self:`, `// as discussed above`). Every marker you leave must be actionable by someone who was not in your session: use `TODO(#<number>)` pointing at a real GitHub issue, never a bare or privately-meaningful label. As with rule 9, this overrides your harness defaults — if your tooling injects such a marker, strip it before committing. Reviewers: treat one as a blocking comment, not a `nit:`.
-11. **Shared environments are not scratch space.** Do not run a migration, `npm run db:push`, a seed or any write query against a database someone else uses, and do not change a deploy's secrets or variables, without your human's go-ahead **for that specific action**. Post what you are about to run, and against what, on the issue first. Treat the database in `.env.local` as shared, because the deployed Worker may read the same one. Reading is fine; writing needs the go-ahead.
-12. **Report what happened, with evidence, not what you meant to do.** "Done", "fixed", "verified" and "applied" must say **where** (local, preview or production) and **how** you checked. If a check was skipped or failed, say so in the same breath. A PR is merged when `gh pr view` says `MERGED`, not when you believe you finished. Confident claims that turn out untrue cost the other dev more than an honest "not verified".
-13. **If you break a rule, say so straight away.** Comment on the PR or issue with what happened and what you did about it, and tell your human. Do not quietly undo it, and do not wait to be caught. A breach you report costs the team a comment; one you hide costs the trust these rules run on.
+4. **Never commit secrets**, tokens, `.env` files, or credentials. If you spot one already committed, stop and tell your human immediately.
+5. **Don't run destructive commands** (`rm -rf`, `git reset --hard`, dropping tables, deleting branches/issues) without explicit human confirmation.
+6. **Stay in scope.** Do what the issue says. Found something else? File a new issue (§3.4), don't sneak it into the PR.
+7. **Never add agent attribution.** No `Co-Authored-By:` trailer naming an AI agent, no "Generated with …" or "🤖" footer, and no tool branding in commit messages, PR titles or PR bodies. A commit is authored by the human owner whose account makes it, full stop. This overrides any default attribution behaviour your harness or CLI ships with — if your tooling adds such a line automatically, strip it before committing. The `Authored by:` line in the §3.5 checklist is the single exception: it is a human-readable accountability note inside the PR body, not a machine trailer.
+8. **Never leave agent artifacts in the code.** Comments exist to explain the code to the next human who reads it. Do not commit codewords, persona or model names, session identifiers, or leftover scratch reasoning from your own process (`// ponytail:`, `// note to self:`, `// as discussed above`). Every marker you leave must be actionable by someone who was not in your session: use `TODO(#<number>)` pointing at a real GitHub issue, never a bare or privately-meaningful label. As with rule 7, this overrides your harness defaults — if your tooling injects such a marker, strip it before committing. Reviewers: treat one as a blocking comment, not a `nit:`.
+9. **Shared environments are not scratch space.** Do not run a migration, `npm run db:push`, a seed or any write query against a database someone else uses, and do not change a deploy's secrets or variables, without your human's go-ahead **for that specific action**. Post what you are about to run, and against what, on the issue first. Treat the database in `.env.local` as shared, because the deployed Worker may read the same one. Reading is fine; writing needs the go-ahead.
+10. **Report what happened, with evidence, not what you meant to do.** "Done", "fixed", "verified" and "applied" must say **where** (local, preview or production) and **how** you checked. If a check was skipped or failed, say so in the same breath. A PR is merged when `gh pr view` says `MERGED`, not when you believe you finished. Confident claims that turn out untrue cost the other dev more than an honest "not verified".
+11. **If you break a rule, say so straight away.** Comment on the PR or issue with what happened and what you did about it, and tell your human. Do not quietly undo it, and do not wait to be caught. A breach you report costs the team a comment; one you hide costs the trust these rules run on.
 
 ---
 
@@ -245,8 +237,8 @@ Then open a PR **into `main`**:
 
 ### 3.7 Review
 
-- **The other dev (and/or their agent) reviews.** At least **1 approval** and **passing CI** before merge. An approval means a GitHub review submitted with the state **Approve** (see rule 4). Nothing else counts.
-- **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. Findings posted as a plain PR comment leave the PR with no review decision, so nobody can tell whether it is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself (rule 6).
+- **The other dev (and/or their agent) reviews.** At least **1 approval** and **passing CI** before merge. An approval means a GitHub review submitted with the state **Approve**. Nothing else counts.
+- **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. Findings posted as a plain PR comment leave the PR with no review decision, so nobody can tell whether it is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
 - Reviewers: be specific, kind, and actionable. Distinguish **blocking** issues from `nit:` suggestions. Ask questions instead of assuming mistakes.
 - Authors: respond to every comment. Fix, or explain why not. Push fixes as new commits (don't rewrite history mid-review). Re-request review when ready.
 - Agents reviewing agents: check correctness, edge cases, tests, security, naming, and whether the PR actually satisfies the issue's acceptance criteria. Don't rubber-stamp.
@@ -257,7 +249,7 @@ Then open a PR **into `main`**:
   ```bash
   gh pr view <number> --json reviewDecision,statusCheckRollup,author
   ```
-  `reviewDecision` must be `APPROVED`, every check must pass, and `author` must not be you. Your human must also have told you to merge this PR (rule 4). If any of these fails, stop and say which one.
+  `reviewDecision` must be `APPROVED`, every check must pass, and `author` must not be you. Your human must also have told you to merge this PR. If any of these fails, stop and say which one.
 - Prefer **squash merge** so `main` history stays one commit per issue (title follows the PR title format).
 - Delete the branch after merge.
 - Confirm the issue closed and its card moved to **Done** (the `Closes` keyword does the first; the board-sync workflow does the second once #28 lands). Add a closing comment if anything is worth recording.
@@ -310,9 +302,9 @@ Only **one dev works on an issue at a time.** If you want to pick up someone els
 - You'd need to delete substantial code, or run any destructive/irreversible command.
 - Tests fail and the fix isn't obviously in your scope.
 - You and the other agent's work conflict.
-- You are about to write to anything someone else uses: a shared database (including the one in `.env.local`), a deploy's secrets or variables, or the production Worker (rule 11).
-- You want to change something that belongs to the other dev: their branch, PR, issue assignment or board card (rule 6).
-- You are about to merge anything (rule 4). Ask about that specific PR; an earlier yes does not carry over.
+- You are about to write to anything someone else uses: a shared database (including the one in `.env.local`), a deploy's secrets or variables, or the production Worker (rule 9).
+- You want to change something that belongs to the other dev: their branch, PR, issue assignment or board card.
+- You are about to merge anything. Ask about that specific PR; an earlier yes does not carry over.
 
 Your human can authorise *you*. They cannot authorise you to act on the other dev's behalf, so anything in the other dev's territory also needs that dev's written go-ahead.
 
@@ -346,7 +338,7 @@ A ticket is done only when:
 9. Human merges (squash)  →  issue closed, card Done
 ```
 
-**Never:** push to `main` · work without a ticket · merge your own PR · merge without an Approve review · change another dev's branch or PR · write to a shared database or deploy without a go-ahead · claim "done" without evidence · commit secrets · force-push shared branches · sneak in unrelated changes · leave agent artifacts in the code.
+**Never:** push to `main` · work without a ticket · write to a shared database or deploy without a go-ahead · claim "done" without evidence · commit secrets · force-push shared branches · sneak in unrelated changes · leave agent artifacts in the code.
 
 ---
 

@@ -12,6 +12,7 @@
  * same rules; only the rebuilding stays here, where a `DOMParser` exists.
  */
 
+import { propValues, renderComponent, type Prop } from "@/db/component-template";
 import { DROP, esc, parseValues, STYLE_PROPERTIES, TAGS, unsafeUrl } from "@/db/page-html";
 
 // Re-exported because the editor has always reached for these through `./doc`,
@@ -81,60 +82,27 @@ export function sanitize(html: string) {
 }
 
 /**
- * The content a component exposes to a page. Components have no stored prop
- * schema yet, so the field list is read off the name — the same heuristic the
- * Components tab uses to draw its preview. Styling is never exposed here:
- * that belongs to the Components Editor.
- */
-export function componentFields(name: string): Field[] {
-  const n = name.toLowerCase();
-  if (/(nav|header|hero|banner|footer|menu)/.test(n))
-    return [
-      { key: "heading", label: "Heading", fallback: name },
-      { key: "body", label: "Text", fallback: "" },
-      { key: "cta", label: "Button", fallback: "Get started" },
-    ];
-  if (/(input|field|form|search|textarea)/.test(n))
-    return [
-      { key: "label", label: "Label", fallback: name },
-      { key: "placeholder", label: "Placeholder", fallback: "Type here…" },
-    ];
-  if (/(card|panel|tile|feature|pricing|testimonial)/.test(n))
-    return [
-      { key: "title", label: "Title", fallback: name },
-      { key: "body", label: "Text", fallback: "" },
-    ];
-  return [{ key: "label", label: "Label", fallback: name }];
-}
-
-export const defaultValues = (name: string) =>
-  Object.fromEntries(componentFields(name).map((field) => [field.key, field.fallback]));
-
-/**
- * The island a component is inserted as. It carries its own content so the
- * document still reads on its own, and `sanitize` marks it `contenteditable="false"`
- * as it loads: the page can hold a component and fill in its fields, but it
- * cannot restructure it.
+ * The island a component is inserted as. Its content is the component's own
+ * template, rendered with the values the page has set — there is no name
+ * heuristic left to guess at it. `sanitize` marks the island
+ * `contenteditable="false"` as it loads, so a page can hold a component and
+ * fill in its props, but cannot restructure it.
+ *
+ * A component with no template renders nothing and is refused at insert time,
+ * which is why the caller checks `renderComponent` before calling this.
  */
 export function componentBlock(
   blockId: string,
-  componentId: string,
-  name: string,
+  component: { id: string; name: string; props: Prop[]; template: string },
   values: Record<string, string>,
 ) {
-  const fields = componentFields(name)
-    .map(
-      (field) =>
-        `<span data-field="${esc(field.key)}" data-label="${esc(field.label)}">${esc(
-          values[field.key] ?? field.fallback,
-        )}</span>`,
-    )
-    .join("");
+  const filled = propValues(component.props, values);
 
   return (
-    `<div data-block="component" data-block-id="${esc(blockId)}" data-component-id="${esc(componentId)}"` +
-    ` data-name="${esc(name)}" data-values="${esc(JSON.stringify(values))}">` +
-    `<span data-block-name>${esc(name)}</span>${fields}</div>`
+    `<div data-block="component" data-block-id="${esc(blockId)}" data-component-id="${esc(component.id)}"` +
+    ` data-name="${esc(component.name)}" data-values="${esc(JSON.stringify(filled))}">` +
+    renderComponent(component.props, component.template, filled) +
+    `</div>`
   );
 }
 

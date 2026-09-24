@@ -1,6 +1,7 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "../app/dashboard/[space]/design.generated.json";
+import type { Prop } from "./component-template";
 
 type Client = NeonQueryFunction<false, false>;
 let client: Client | null = null;
@@ -53,6 +54,8 @@ export type ComponentRow = {
   id: string;
   name: string;
   description: string;
+  props: unknown;
+  template: string;
   origin_name: string | null;
   origin_space_name: string | null;
 };
@@ -158,7 +161,7 @@ export async function setPageHtml(id: string, html: string) {
 
 export const listComponents = (spaceId: string) =>
   rows<ComponentRow>(db()`
-    select c.id, c.name, c.description,
+    select c.id, c.name, c.description, c.props, c.template,
       o.name as origin_name, os.name as origin_space_name
     from components c
     left join components o on o.id = c.origin_component_id
@@ -244,26 +247,48 @@ export async function createComponent(
   spaceId: string,
   name: string,
   description: string,
+  props: Prop[] = [],
+  template = "",
 ): Promise<{ id: string } | null> {
   const [row] = await rows<{ id: string }>(db()`
-    insert into components (space_id, name, description)
-    values (${spaceId}, ${name}, ${description})
+    insert into components (space_id, name, description, props, template)
+    values (${spaceId}, ${name}, ${description}, ${JSON.stringify(props)}::jsonb, ${template})
     on conflict (space_id, name) do nothing
     returning id`);
   return row ?? null;
 }
 
 /**
+ * Replaces what a component declares. Only the props and the template — the
+ * name is what other rows and pages already refer to, so it stays put. False
+ * when no such component exists in that space.
+ */
+export async function updateComponent(
+  spaceId: string,
+  id: string,
+  props: Prop[],
+  template: string,
+) {
+  const found = await rows<{ id: string }>(db()`
+    update components
+    set props = ${JSON.stringify(props)}::jsonb, template = ${template}
+    where id = ${id} and space_id = ${spaceId}
+    returning id`);
+  return found.length > 0;
+}
+
+/**
  * Copies a component from another space, keeping a link to where it came from.
  * Null when the source is in the same space or the name is already taken here.
+ * The props and the template come along, so the copy renders like its original.
  */
 export async function importComponent(
   spaceId: string,
   componentId: string,
 ): Promise<{ id: string; name: string } | null> {
   const [row] = await rows<{ id: string; name: string }>(db()`
-    insert into components (space_id, name, description, origin_component_id)
-    select ${spaceId}, name, description, id
+    insert into components (space_id, name, description, origin_component_id, props, template)
+    select ${spaceId}, name, description, id, props, template
     from components
     where id = ${componentId} and space_id <> ${spaceId}
     on conflict (space_id, name) do nothing

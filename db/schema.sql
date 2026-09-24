@@ -39,6 +39,18 @@ create table if not exists components (
   unique (space_id, name)
 );
 
+-- What a component is, now that it is not inferred from its name: the props it
+-- declares for page editing, and the template that turns them into markup. A
+-- component with neither is simply not insertable yet, which is why these
+-- default to empty rather than to a guess.
+--
+-- `import` copies both, so an imported component renders the same as its
+-- original until the copy is edited.
+alter table components
+  add column if not exists props jsonb not null default '[]'::jsonb;
+alter table components
+  add column if not exists template text not null default '';
+
 create index if not exists pages_space_idx on pages (space_id);
 create index if not exists components_space_idx on components (space_id);
 create index if not exists design_systems_space_idx on design_systems (space_id);

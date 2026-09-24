@@ -12,7 +12,9 @@ import {
   LIMITS,
   setPageHtml,
   slugify,
+  updateComponent as setComponent,
 } from "@/db";
+import { parseProps, parseTemplate, type Prop } from "@/db/component-template";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -27,6 +29,24 @@ function uuid(value: FormDataEntryValue | null) {
 }
 
 const refresh = () => revalidatePath("/dashboard", "layout");
+
+/**
+ * The props a component declares, written one per line as `key | Label |
+ * fallback`. Parsed through `parseProps`, so a line that is not a usable prop is
+ * dropped here exactly as it would be if it had arrived from an agent.
+ */
+function props(value: FormDataEntryValue | null): Prop[] {
+  const lines = (typeof value === "string" ? value : "").split("\n").slice(0, 40);
+  return parseProps(
+    lines.flatMap((line) => {
+      const [key, label, fallback] = line.split("|").map((part) => part.trim());
+      return key ? [{ key, label: label ?? "", fallback: fallback ?? "" }] : [];
+    }),
+  );
+}
+
+const template = (value: FormDataEntryValue | null) =>
+  parseTemplate(typeof value === "string" ? value.trim() : "");
 
 export async function createSpace(formData: FormData) {
   const name = text(formData.get("name"), LIMITS.spaceName);
@@ -89,7 +109,26 @@ export async function createComponent(formData: FormData) {
   const name = text(formData.get("name"), LIMITS.componentName);
   if (!spaceId || !name) return;
 
-  await insertComponent(spaceId, name, text(formData.get("description"), LIMITS.componentDescription));
+  await insertComponent(
+    spaceId,
+    name,
+    text(formData.get("description"), LIMITS.componentDescription),
+    props(formData.get("props")),
+    template(formData.get("template")),
+  );
+  refresh();
+}
+
+/**
+ * What a component declares, rather than how it looks: its props and the
+ * template they fill. The name stays put, because pages and imports refer to it.
+ */
+export async function updateComponent(formData: FormData) {
+  const spaceId = uuid(formData.get("spaceId"));
+  const id = uuid(formData.get("id"));
+  if (!spaceId || !id) return;
+
+  await setComponent(spaceId, id, props(formData.get("props")), template(formData.get("template")));
   refresh();
 }
 

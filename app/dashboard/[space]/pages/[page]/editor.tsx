@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { propValues, type Prop } from "@/db/component-template";
 import { renamePage, savePageBlocks } from "../../../actions";
 import {
   AFTER_BLOCK,
   componentBlock,
-  componentFields,
-  defaultValues,
   esc,
   parseValues,
   sanitize,
 } from "./doc";
 
-type ComponentOption = { id: string; name: string };
+type ComponentOption = { id: string; name: string; props: Prop[]; template: string };
 type SelectedBlock = {
   id: string;
   componentId: string;
@@ -199,10 +198,15 @@ export function PageEditor({
   const insertComponent = (component: ComponentOption) => {
     const id = uid();
     insertHtml(
-      componentBlock(id, component.id, component.name, defaultValues(component.name)) + AFTER_BLOCK,
+      componentBlock(id, component, propValues(component.props)) + AFTER_BLOCK,
     );
     menu.current?.removeAttribute("open");
   };
+
+  /** The component a selected island was inserted from, if it is still here. */
+  const selectedComponent = selected
+    ? (components.find((component) => component.id === selected.componentId) ?? null)
+    : null;
 
   const clearSelection = () => {
     root.current
@@ -239,8 +243,9 @@ export function PageEditor({
   const redrawBlock = (block: SelectedBlock, values: Record<string, string>) => {
     const canvas = root.current;
     const island = canvas ? findIsland(canvas, block.id) : null;
-    if (!canvas || !island) return;
-    island.outerHTML = sanitize(componentBlock(block.id, block.componentId, block.name, values));
+    const component = components.find((option) => option.id === block.componentId);
+    if (!canvas || !island || !component) return;
+    island.outerHTML = sanitize(componentBlock(block.id, component, values));
     findIsland(canvas, block.id)?.classList.add("is-selected");
     markDirty();
   };
@@ -437,17 +442,25 @@ export function PageEditor({
           </div>
 
           <div className="mt-3 grid gap-3">
-            {componentFields(selected.name).map((field) => (
-              <label key={field.key} className="grid gap-1">
-                <span className="label">{field.label}</span>
-                <input
-                  className="input"
-                  value={selected.values[field.key] ?? field.fallback}
-                  maxLength={300}
-                  onChange={(event) => editField(field.key, event.target.value)}
-                />
-              </label>
-            ))}
+            {selectedComponent && selectedComponent.props.length > 0 ? (
+              selectedComponent.props.map((prop) => (
+                <label key={prop.key} className="grid gap-1">
+                  <span className="label">{prop.label}</span>
+                  <input
+                    className="input"
+                    value={selected.values[prop.key] ?? prop.fallback}
+                    maxLength={300}
+                    onChange={(event) => editField(prop.key, event.target.value)}
+                  />
+                </label>
+              ))
+            ) : (
+              <p className="text-xs leading-relaxed text-smoke">
+                {selectedComponent
+                  ? "This component declares no props yet, so there is nothing to set."
+                  : "This component is no longer in the space, so it can only be removed."}
+              </p>
+            )}
           </div>
 
           <p className="mt-3 text-xs leading-relaxed text-smoke">

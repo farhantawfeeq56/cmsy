@@ -8,10 +8,15 @@
  * Plain JS on purpose: it must run under any Node the team has, and the app
  * only ever imports the generated JSON.
  */
-import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const root = new URL("../", import.meta.url);
+
+/** One line and a non-zero exit, rather than an assertion dump in a build log. */
+function fail(message) {
+  console.error(`design:sync: ${message}`);
+  process.exit(1);
+}
 
 /** Minimal YAML subset: `key: value` pairs and nested blocks by indentation. */
 function parseYaml(src) {
@@ -45,7 +50,7 @@ const asTree = (value) =>
 /** DESIGN.md → the rules the Design System view renders. */
 function parseDesign(source) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(source);
-  assert.ok(match, "DESIGN.md is missing its YAML frontmatter");
+  if (!match) fail("DESIGN.md is missing its YAML frontmatter");
 
   const meta = parseYaml(match[1]);
   const prose = match[2];
@@ -87,10 +92,18 @@ const design = parseDesign(
 );
 
 // Fail the build rather than shipping an empty design system view.
-assert.ok(design.colors.length > 0, "DESIGN.md has no colors in its frontmatter");
-assert.ok(design.typography.length > 0, "DESIGN.md has no typography in its frontmatter");
-assert.ok(design.rounded.length > 0, "DESIGN.md has no rounded values in its frontmatter");
-assert.ok(design.guidelines.length > 0, "DESIGN.md has no `## Section` prose");
+if (!design.colors.length) fail("DESIGN.md has no colors in its frontmatter");
+
+// A value that is not hex (a stray inline comment, a named colour) renders as a
+// blank swatch, so fail the sync rather than ship one.
+const notHex = design.colors.filter((color) => !/^#[0-9a-f]{3,8}$/i.test(color.value));
+if (notHex.length) {
+  fail(`DESIGN.md has colours that are not hex: ${JSON.stringify(notHex)}`);
+}
+
+if (!design.typography.length) fail("DESIGN.md has no typography in its frontmatter");
+if (!design.rounded.length) fail("DESIGN.md has no rounded values in its frontmatter");
+if (!design.guidelines.length) fail("DESIGN.md has no `## Section` prose");
 
 const out = new URL("app/dashboard/[space]/design.generated.json", root);
 writeFileSync(out, `${JSON.stringify(design, null, 2)}\n`);

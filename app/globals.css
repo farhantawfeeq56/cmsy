@@ -170,7 +170,7 @@ body {
 }
 
 /* The writing surface itself: one column, headings in Nohemi, body in Jakarta. */
-.doc { margin-top: 1.5rem; min-height: 60vh; outline: none; line-height: 1.7; }
+.doc { margin-top: 1.5rem; min-height: 60vh; outline: none; line-height: 1.7; overflow-wrap: break-word; }
 .doc > * + * { margin-top: 0.75rem; }
 .doc h1, .doc h2, .doc h3 {
   font-family: var(--font-nohemi), Arial, sans-serif;
@@ -189,6 +189,8 @@ body {
 .doc a { color: var(--color-signal); text-decoration: underline; }
 .doc img { max-width: 100%; border-radius: 12px; }
 .doc code { border-radius: 4px; background: #1111110a; padding: 0.1rem 0.25rem; font-size: 0.875em; }
+.doc pre { border-radius: 8px; background: #1111110a; padding: 0.75rem 1rem; overflow-x: auto; font-size: 0.875rem; }
+.doc pre code { background: none; padding: 0; }
 .doc hr { border: 0; border-top: 1px solid var(--color-line); margin: 1.5rem 0; }
 
 /* An inserted component. The page holds it and fills its fields; the look of
@@ -211,4 +213,9 @@ body {
   content: attr(data-label) ": ";
   color: var(--color-smoke);
   font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .doc-title { font-size: 2rem; letter-spacing: -1px; }
+  .doc-page { padding: 1.5rem 1rem 8rem; }
 }

@@ -281,7 +281,7 @@ export function PageEditor({
   return (
     <main className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[46rem] flex-wrap items-center gap-x-2 gap-y-2 px-6 py-3">
+        <div className="mx-auto flex w-full max-w-[46rem] flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6">
           <Link href={`/dashboard/${space.slug}`} className="btn-quiet -ml-2 shrink-0 rounded-md">
             ← {space.name}
           </Link>

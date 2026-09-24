@@ -39,14 +39,15 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > **`main` is protected, and the protection is enforced.** A ruleset named `main-protection`
 > (id `23748284`, targets `~DEFAULT_BRANCH`) has been on **Active** enforcement since
 > 2026-09-24, with `bypass_actors: []`, so no one — admin included — can bypass it. It refuses
-> deletions and non-fast-forward pushes, and requires a pull request with **1 approving review**.
+> deletions and non-fast-forward pushes, and requires a pull request with **0 approving reviews**
+> (#77, #81 — the bot comment is the review).
 >
-> **Owner's agent (`@farhantawfeeq56`'s Pi): enable and keep the 1 approving review on `main`.**
+> **Owner's agent (`@farhantawfeeq56`'s Pi): keep 0 approving reviews on `main`.**
 > Only a repo admin can set it, so it is yours to do. Open Settings → Rules → Rulesets →
-> `main-protection` and set *Required approvals* to **1**. Then confirm that
+> `main-protection` and set *Required approvals* to **0**. Then confirm that
 > `gh api repos/farhantawfeeq56/cmsy/rules/branches/main` reports
-> `"required_approving_review_count": 1`. If it ever reads `0`, fix it before anything else merges
-> and comment on #23. No other agent can change this setting, so do not leave it to one.
+> `"required_approving_review_count": 0`. If it ever reads `1`, fix it before anything else merges
+> and comment on #81. No other agent can change this setting, so do not leave it to one.
 >
 > Check it rather than trust it, because it has been wrong before:
 >
@@ -63,9 +64,9 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > The repo is public (since 2026-09-24), which is what the Free plan requires for enforceable
 > rulesets on a personal account.
 >
-> **No status check is required yet**, so a red CI run does not block a merge by itself. Review
-> still has to pass on its own merits. Merging is enforced by GitHub; the agent never presses the
-> button, approval or not.
+> **No status check is required yet**, so a red CI run does not block a merge by itself. The bot
+> review comment still has to be addressed on its merits. Merging is enforced by GitHub; the agent
+> never presses the button without being told, approval or not.
 
 You act **on behalf of your human owner**. They approve anything risky, ambiguous, or irreversible.
 
@@ -93,8 +94,8 @@ by `@AathilFelix` without it being a lapse.
 
 The
 authorisation is between the two humans and concerns who may press the button, not whether review
-happens. Every PR still needs the other dev's recorded approval, and an agent still waits to be
-told, per PR.
+happens. Human approval is optional and never required; every PR still needs its bot review
+addressed, and an agent still waits to be told, per PR.
 
 ---
 
@@ -119,7 +120,7 @@ told, per PR.
 
 ```
 GitHub issue → branch → small commits → tests pass → push branch → open PR
-   → board: In Review → review + fixes → human merges → board: Done
+   → board: In Review → bot review + fixes → merge on human go → board: Done
 ```
 
 The issue itself only has **open** and **closed**. Everything between — Backlog, Todo,
@@ -270,10 +271,14 @@ Then open a PR **into `main`**:
 
 ### 3.7 Review
 
-- **The other dev (and/or their agent) reviews.** At least **1 approval** and **passing CI** before merge. An approval means a GitHub review submitted with the state **Approve**. Nothing else counts.
-- **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. Findings posted as a plain PR comment leave the PR with no review decision, so nobody can tell whether it is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
+- **The bot review is the review.** `pr-review.yml` posts at most 2 recommendations as ONE
+  `github-actions` comment. Human `Approve` is optional and never required (0 approvals, #77).
+  A plain bot comment leaves `reviewDecision` empty by design — that is fine.
+- **Human reviews, when they happen, are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. Findings posted as a plain PR comment leave no review decision. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
 - Reviewers: be specific, kind, and actionable. Distinguish **blocking** issues from `nit:` suggestions. Ask questions instead of assuming mistakes.
-- Authors: respond to every comment. Fix, or explain why not. Push fixes as new commits (don't rewrite history mid-review). Re-request review when ready.
+- Authors: respond to every bot comment. Fix, or explain why not. Push fixes as new commits
+  (don't rewrite history mid-review). No re-request needed — merge on human go once the bot
+  comment is addressed.
 - Agents reviewing agents: check correctness, edge cases, tests, security, naming, and whether the PR actually satisfies the issue's acceptance criteria. Don't rubber-stamp.
 
 ### 3.8 Merge & close out
@@ -282,7 +287,9 @@ Then open a PR **into `main`**:
   ```bash
   gh pr view <number> --json reviewDecision,statusCheckRollup,author
   ```
-  `reviewDecision` must be `APPROVED`, every check must pass, and `author` must not be you. Your human must also have told you to merge this PR. If any of these fails, stop and say which one.
+  `reviewDecision` must not be `CHANGES_REQUESTED`, every check must pass (or be explained),
+  the bot comment must be addressed, and `author` must not be you. Your human must also have told
+  you to merge this PR. If any of these fails, stop and say which one.
 - Prefer **squash merge** so `main` history stays one commit per issue (title follows the PR title format).
 - Delete the branch after merge.
 - Confirm the issue closed and its card moved to **Done** (the `Closes` keyword does the first; the board-sync workflow does the second once #28 lands). Add a closing comment if anything is worth recording.
@@ -351,7 +358,7 @@ A ticket is done only when:
 - [ ] Tests written/updated and passing; CI is green
 - [ ] Lint/format clean
 - [ ] Docs updated where relevant
-- [ ] PR has a submitted **Approve** review from someone other than the author (`reviewDecision: APPROVED`)
+- [ ] Bot review comment addressed (fixed or replied why not); no unresolved `CHANGES_REQUESTED`; CI is green
 - [ ] Merged to `main` via PR (squash), branch deleted
 - [ ] Issue is closed and its card is **Done**; follow-ups are filed
 
@@ -367,8 +374,8 @@ A ticket is done only when:
 5. Test + lint locally
 6. git push -u origin <branch>  →  open PR (template, "Closes #<number>")
 7. Board → In Review + PR link
-8. Review, fix, re-request
-9. Human merges (squash)  →  issue closed, card Done
+8. Bot review, fix, merge on go
+9. Merge on human go (squash)  →  issue closed, card Done
 ```
 
 **Never:** push to `main` · work without a ticket · write to a shared database or deploy without a go-ahead · claim "done" without evidence · commit secrets · force-push shared branches · sneak in unrelated changes · leave agent artifacts in the code.

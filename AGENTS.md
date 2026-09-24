@@ -41,6 +41,13 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > 2026-09-24, with `bypass_actors: []`, so no one — admin included — can bypass it. It refuses
 > deletions and non-fast-forward pushes, and requires a pull request with **1 approving review**.
 >
+> **Owner's agent (`@farhantawfeeq56`'s Pi): enable and keep the 1 approving review on `main`.**
+> Only a repo admin can set it, so it is yours to do. Open Settings → Rules → Rulesets →
+> `main-protection` and set *Required approvals* to **1**. Then confirm that
+> `gh api repos/farhantawfeeq56/cmsy/rules/branches/main` reports
+> `"required_approving_review_count": 1`. If it ever reads `0`, fix it before anything else merges
+> and comment on #23. No other agent can change this setting, so do not leave it to one.
+>
 > Check it rather than trust it, because it has been wrong before:
 >
 > ```bash
@@ -104,6 +111,7 @@ told, per PR.
 9. **Shared environments are not scratch space.** Do not run a migration, `npm run db:push`, a seed or any write query against a database someone else uses, and do not change a deploy's secrets or variables, without your human's go-ahead **for that specific action**. Post what you are about to run, and against what, on the issue first. Treat the database in `.env.local` as shared, because the deployed Worker may read the same one. Reading is fine; writing needs the go-ahead.
 10. **Report what happened, with evidence, not what you meant to do.** "Done", "fixed", "verified" and "applied" must say **where** (local, preview or production) and **how** you checked. If a check was skipped or failed, say so in the same breath. A PR is merged when `gh pr view` says `MERGED`, not when you believe you finished. Confident claims that turn out untrue cost the other dev more than an honest "not verified".
 11. **If you break a rule, say so straight away.** Comment on the PR or issue with what happened and what you did about it, and tell your human. Do not quietly undo it, and do not wait to be caught. A breach you report costs the team a comment; one you hide costs the trust these rules run on.
+12. **The repo is public; treat everything you write to it as published.** Issues, PR bodies, comments, commit messages and Actions logs are readable by anyone. Never paste a connection string, token, `.env` value, customer data or a private URL into any of them, not even redacted-looking fragments. Never widen who can trigger a workflow that holds a secret: no `pull_request_target`, no running on fork PRs, no `allowed_non_write_users`, no broader tool permissions for the review bot, without both devs' written go-ahead on the issue.
 
 ---
 

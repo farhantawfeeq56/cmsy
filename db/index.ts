@@ -100,7 +100,7 @@ export const listRecentActivity = (limit = 5) =>
     limit ${limit}
   `);
 
-export async function getSpace(slug: string) {
+export async function getSpace(slug: string): Promise<Omit<Space, "updated_at"> | null> {
   const found = await rows<Omit<Space, "updated_at">>(db()`
     select
       s.id, s.name, s.slug,
@@ -124,7 +124,7 @@ export const listPages = (spaceId: string) =>
   `);
 
 /** One page, by its slug within a space, including the document body. */
-export async function getPage(spaceId: string, slug: string) {
+export async function getPage(spaceId: string, slug: string): Promise<PageDetail | null> {
   const found = await rows<PageDetail>(db()`
     select id, title, slug, blocks
     from pages
@@ -390,7 +390,7 @@ export async function insertMcpToken(token: {
   name: string;
   prefix: string;
   hash: string;
-}) {
+}): Promise<{ id: string } | null> {
   const [row] = await rows<{ id: string }>(db()`
     insert into mcp_tokens (owner, name, token_prefix, token_hash)
     values (${token.owner}, ${token.name}, ${token.prefix}, ${token.hash})
@@ -408,7 +408,9 @@ export const revokeMcpToken = (id: string) =>
  * stamped. Returns null for unknown *and* revoked tokens — the caller must not
  * be able to tell those apart.
  */
-export async function authenticateMcpToken(hash: string) {
+export async function authenticateMcpToken(
+  hash: string,
+): Promise<{ id: string; owner: string; name: string } | null> {
   const [row] = await rows<{ id: string; owner: string; name: string }>(db()`
     update mcp_tokens
     set last_used_at = now()

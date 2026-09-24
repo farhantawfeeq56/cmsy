@@ -56,9 +56,8 @@ const call = async (name: string, args: Record<string, unknown>) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // getSpace is typed as never returning null, but it does for an unknown slug.
-  vi.mocked(db.getSpace).mockImplementation(
-    async (slug) => (slug === "docs" ? DOCS : slug === "marketing-site" ? SITE : null) as typeof DOCS,
+  vi.mocked(db.getSpace).mockImplementation(async (slug) =>
+    slug === "docs" ? DOCS : slug === "marketing-site" ? SITE : null,
   );
 });
 
@@ -321,11 +320,6 @@ describe("list_recent_activity", () => {
 
 const PRICING = { id: "p1", title: "Pricing", slug: "pricing", blocks: { html: "<p>Simple</p>" } };
 
-// `getPage` is typed as never returning null even though it does on a miss, so
-// a miss needs a cast here exactly as `authenticateMcpToken` does in
-// app/api/mcp/route.test.ts. #61 is where that typing gets fixed.
-const NO_PAGE = null as never;
-
 describe("get_page", () => {
   it("returns the stored body by space and page slug", async () => {
     vi.mocked(db.getPage).mockResolvedValue(PRICING);
@@ -346,7 +340,7 @@ describe("get_page", () => {
   });
 
   it("is a tool error for an unknown page, naming the space", async () => {
-    vi.mocked(db.getPage).mockResolvedValue(NO_PAGE);
+    vi.mocked(db.getPage).mockResolvedValue(null);
     const result = await call("get_page", { space: "docs", page: "nope" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("nope");
@@ -412,7 +406,7 @@ describe("set_page_blocks", () => {
   });
 
   it("does not write to a page that does not exist", async () => {
-    vi.mocked(db.getPage).mockResolvedValue(NO_PAGE);
+    vi.mocked(db.getPage).mockResolvedValue(null);
     const result = await call("set_page_blocks", { space: "docs", page: "nope", html: "<p>x</p>" });
     expect(result.isError).toBe(true);
     expect(db.setPageHtml).not.toHaveBeenCalled();

@@ -95,3 +95,61 @@ describe("pageHtml", () => {
     expect(pageHtml({ html: 42 })).toBe("");
   });
 });
+
+describe("slugify", () => {
+  it("lowercases, hyphenates and trims the ends", async () => {
+    const { slugify } = await load();
+    expect(slugify("  Marketing Site! ")).toBe("marketing-site");
+  });
+
+  it("falls back to untitled when nothing survives", async () => {
+    const { slugify } = await load();
+    expect(slugify("!!!")).toBe("untitled");
+  });
+});
+
+describe("insertWithSlug", () => {
+  it("retries with a numeric suffix and reports the slug it used", async () => {
+    const { insertWithSlug } = await load();
+    const taken = new Set(["docs", "docs-2"]);
+    const run = async (slug: string) => (taken.has(slug) ? [] : [{ id: `id-${slug}` }]);
+    expect(await insertWithSlug(run, "docs")).toEqual({ id: "id-docs-3", slug: "docs-3" });
+  });
+});
+
+describe("createSpace", () => {
+  it("creates the space, seeds its design system from DESIGN.md and selects it", async () => {
+    nextRows = [{ id: "s1" }];
+    const { createSpace } = await load();
+    expect(await createSpace("Docs")).toEqual({ id: "s1", slug: "docs" });
+
+    expect(calls[0].sql).toMatch(/insert into spaces/);
+    expect(calls[1].sql).toMatch(/insert into design_systems \(space_id, name, tokens\)/);
+    expect(JSON.parse(calls[1].values[2] as string)).toHaveProperty("colors");
+    expect(calls[2].sql).toMatch(/update spaces set design_system_id/);
+  });
+});
+
+describe("component writes", () => {
+  it("reports a taken name as null instead of inserting a duplicate", async () => {
+    const { createComponent } = await load();
+    expect(await createComponent("s1", "Hero", "")).toBeNull();
+    expect(calls[0].sql).toMatch(/on conflict \(space_id, name\) do nothing/);
+  });
+
+  it("only imports from another space", async () => {
+    const { importComponent } = await load();
+    expect(await importComponent("s1", "c1")).toBeNull();
+    expect(calls[0].sql).toMatch(/space_id <> \$\?/);
+    expect(calls[0].values).toEqual(["s1", "c1", "s1"]);
+  });
+
+  it("deletes only within the given space and says whether anything went", async () => {
+    const { deleteComponent } = await load();
+    expect(await deleteComponent("s1", "c1")).toBe(false);
+    expect(calls[0].sql).toMatch(/where id = \$\? and space_id = \$\?/);
+
+    nextRows = [{ id: "c1" }];
+    expect(await deleteComponent("s1", "c1")).toBe(true);
+  });
+});

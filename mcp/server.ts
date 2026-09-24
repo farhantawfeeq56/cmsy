@@ -504,12 +504,17 @@ const componentWriteOutput = componentResult.extend({ declared: componentDeclare
  *
  * Refused rather than trimmed, the way `set_page_blocks` refuses: a prop the
  * parser would drop and markup the editor would strip both come back as
- * problems. `stored` is what the component already declares, so a template sent
- * on its own is judged against the props it will actually render with.
+ * problems.
+ *
+ * `stored` is what the component already declares, and the two are checked as
+ * the pair they will be rendered as — not just the half that was sent. Sending
+ * props alone would otherwise skip the check, and a renamed prop would leave the
+ * stored template pointing at a name nothing declares, so the component would
+ * quietly stop rendering with nothing said at write time.
  */
 function declaredFields(
   input: { props?: Prop[]; template?: string },
-  stored: Prop[] = [],
+  stored: { props: Prop[]; template: string } = { props: [], template: "" },
 ) {
   const problems: string[] = [];
   let props: Prop[] | null = null;
@@ -526,7 +531,9 @@ function declaredFields(
   }
 
   const template = input.template === undefined ? null : parseTemplate(input.template);
-  if (template !== null) problems.push(...componentProblems(props ?? stored, template));
+  if (props !== null || template !== null) {
+    problems.push(...componentProblems(props ?? stored.props, template ?? stored.template));
+  }
 
   return { problems, props, template };
 }
@@ -629,10 +636,20 @@ function registerUpdateComponent(server: McpServer) {
       }
 
       const stored = parseProps(found.props);
-      const declared = declaredFields({ props, template }, stored);
+      const declared = declaredFields(
+        { props, template },
+        { props: stored, template: found.template },
+      );
       if (declared.problems.length) return refused(declared.problems);
 
-      await updateComponent(space.id, found.id, declared.props, declared.template);
+      // False when the row no longer matches the id and space, which is what a
+      // delete between the lookup above and here looks like. Reporting success
+      // then would be a write this tool never made.
+      if (!(await updateComponent(space.id, found.id, declared.props, declared.template))) {
+        return toolError(
+          `${found.name} was removed from ${space.name} while this call was in flight. Call list_components to see what is left.`,
+        );
+      }
 
       return {
         content: [{ type: "text" as const, text: `Updated ${found.name} in ${space.name}.` }],

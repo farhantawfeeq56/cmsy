@@ -234,6 +234,37 @@ describe("update_component", () => {
     expect(db.updateComponent).toHaveBeenCalledWith("s-docs", "c1", [{ key: "heading", label: "heading", fallback: "" }], null);
     expect(result.structuredContent).toMatchObject({ declared: { props: [{ key: "heading", label: "heading", fallback: "" }] } });
   });
+
+  it("refuses props that would orphan the stored template", async () => {
+    vi.mocked(db.findComponent).mockResolvedValue({
+      id: "c1",
+      name: "Hero",
+      props: [{ key: "heading", label: "Heading", fallback: "Hi" }],
+      template: "<h2>{{heading}}</h2>",
+    });
+
+    // Renaming the prop without re-sending the template would leave it pointing
+    // at a name nothing declares, so the component would stop rendering.
+    const result = await call("update_component", {
+      space: "docs",
+      component: "Hero",
+      props: [{ key: "title" }],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/\{\{heading\}\} does not match any declared prop/);
+    expect(db.updateComponent).not.toHaveBeenCalled();
+  });
+
+  it("reports a row that went away between the lookup and the write", async () => {
+    vi.mocked(db.findComponent).mockResolvedValue({ id: "c1", name: "Hero", props: [], template: "" });
+    vi.mocked(db.updateComponent).mockResolvedValue(false);
+
+    const result = await call("update_component", { space: "docs", component: "Hero", template: "<p>Hi</p>" });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/removed from Docs while this call was in flight/);
+  });
 });
 
 describe("delete_component", () => {

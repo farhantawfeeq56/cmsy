@@ -97,9 +97,7 @@ describe("POST /api/mcp: bearer auth off loopback", () => {
   });
 
   it("rejects an unknown or revoked issued token", async () => {
-    // The inferred return type drops null because `const [row] = rows` is
-    // unchecked indexed access, but at runtime a miss resolves to null.
-    vi.mocked(authenticateMcpToken).mockResolvedValue(null as never);
+    vi.mocked(authenticateMcpToken).mockResolvedValue(null);
     const response = await POST(initialize(PUBLIC, bearer("cmsy_revoked")));
     expect(response.status).toBe(401);
   });

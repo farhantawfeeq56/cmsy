@@ -55,6 +55,10 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > gh api -X PUT repos/farhantawfeeq56/cmsy/rulesets/23748284 --input .github/rulesets/main-protection.json
 > ```
 >
+> When the change **adds a required check**, merge first and apply second. A check exists only in
+> branches that contain its workflow, so applying first leaves every open PR waiting on a status it
+> can never report. After applying, rebase open PRs on `main` so they pick the new workflow up.
+>
 > Never change the ruleset in Settings without that PR. The `Branch protection` workflow compares
 > the live rules with the spec on every PR, every push to `main` and daily. Any difference fails the
 > `protection` check, which blocks every PR, and opens an issue tagging both devs. It cannot see

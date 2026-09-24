@@ -260,15 +260,7 @@ Then open a PR **into `main`**:
 - Comment on the issue with the PR link and a 1–2 line summary of what was done and anything the reviewer should know.
 - If scope changed while working, edit the issue body so it matches reality.
 
-### 3.7 Review
-
-- **The other dev (and/or their agent) reviews.** At least **1 approval** and **passing CI** before merge. An approval means a GitHub review submitted with the state **Approve**. Nothing else counts.
-- **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. Findings posted as a plain PR comment leave the PR with no review decision, so nobody can tell whether it is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
-- Reviewers: be specific, kind, and actionable. Distinguish **blocking** issues from `nit:` suggestions. Ask questions instead of assuming mistakes.
-- Authors: respond to every comment. Fix, or explain why not. Push fixes as new commits (don't rewrite history mid-review). Re-request review when ready.
-- Agents reviewing agents: check correctness, edge cases, tests, security, naming, and whether the PR actually satisfies the issue's acceptance criteria. Don't rubber-stamp.
-
-### 3.8 Merge & close out
+### 3.7 Merge & close out
 
 - **Check before you merge, every time:**
   ```bash

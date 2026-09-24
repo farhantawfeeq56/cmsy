@@ -2,6 +2,18 @@
   "name": "cmsy",
   "version": "0.1.0",
   "private": true,
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.11.0 <12",
+      "onFail": "error"
+    }
+  },
   "scripts": {
     "predev": "npm run design:sync",
     "dev": "next dev",

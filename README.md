@@ -71,6 +71,20 @@ This makes it possible to move from:
 Design / Edit → Structured instruction → Agent → Codebase
 ```
 
+## Toolchain
+
+Node 24 and npm 11.11 or newer (`.nvmrc`, and `devEngines` in `package.json`). `npm install`
+and `npm ci` refuse to run on anything else, because npm 10 and early npm 11 rewrite
+`package-lock.json` differently and every install would flip it back and forth.
+
+```bash
+nvm use            # reads .nvmrc
+npm -v             # must print 11.11 or newer; Node 24 ships one
+```
+
+If `npm -v` still prints 10.x under Node 24, a global npm elsewhere on your `PATH` is
+shadowing the bundled one. `npm config get prefix` shows where it lives.
+
 ## Design system
 
 CMSy's visual rules live in [`DESIGN.md`](./DESIGN.md) — colours, type scale, radii and the

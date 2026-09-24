@@ -56,7 +56,8 @@ export async function createSpace(formData: FormData) {
   if (!row) return;
 
   refresh();
-  redirect(`/dashboard/${slugify(name)}`);
+  // The slug actually used, which is `<slug>-2` or higher when `<slug>` is taken.
+  redirect(`/dashboard/${row.slug}`);
 }
 
 export async function createPage(formData: FormData) {

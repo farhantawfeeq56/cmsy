@@ -176,8 +176,13 @@ async function PagesView({ space }: { space: SpaceSummary }) {
         <ul className="mt-5 divide-y divide-line border-t border-line">
           {pages.map((page) => (
             <li key={page.id} className="flex items-center gap-3 py-3.5">
-              <FileIcon className="size-4 shrink-0 text-smoke" />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{page.title}</span>
+              <Link
+                href={`/dashboard/${space.slug}/pages/${page.slug}`}
+                className="flex min-w-0 flex-1 items-center gap-3 py-1"
+              >
+                <FileIcon className="size-4 shrink-0 text-smoke" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{page.title}</span>
+              </Link>
               <span className="shrink-0 text-xs text-smoke">
                 Created {ago(page.created_at)}
               </span>

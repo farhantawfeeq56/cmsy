@@ -1,12 +1,12 @@
 name: CI
 
-# Lint, typecheck and build every PR into main, and main itself after a merge.
+# Lint, typecheck, test and build every PR into main, and main itself after a merge.
 # main deploys to production through Workers Builds, and that check is slow
 # and posts no log to GitHub on failure, so this is the first place a broken
 # change becomes visible with a readable error. See issue #40.
 #
-# There is no test step because there is no test runner yet (#22). The check
-# is advisory until branch protection exists to make it required (#23).
+# The check is advisory until branch protection exists to make it required
+# (#23).
 
 on:
   pull_request:
@@ -38,7 +38,7 @@ jobs:
         id: install
         run: npm ci
 
-      # The three checks run independently once install succeeds, so a lint
+      # The checks run independently once install succeeds, so a lint
       # failure does not hide a type or build error behind it.
       - name: Lint
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -52,6 +52,12 @@ jobs:
         run: |
           npx next typegen
           npx tsc --noEmit
+
+      # Unit tests run in Node with the database stubbed, so they need no
+      # DATABASE_URL and never touch the shared Neon project.
+      - name: Test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test
 
       - name: Build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

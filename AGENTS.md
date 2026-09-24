@@ -33,7 +33,7 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 | Stack | TypeScript · Next.js 16 App Router (React 19, RSC) built with vinext · Cloudflare Workers · Neon Postgres · Tailwind v4 |
 | Install | `npm ci` |
 | Run | `npm run dev` (Next dev server) — or `npm run dev:vinext` (port 3001) to match the deployed Workers runtime |
-| Test | **none yet** — no test runner is configured. §3.3's "add or update tests" rule cannot be honoured until one exists. |
+| Test | `npm test` (Vitest, run once) or `npm run test:watch`. Tests live next to the code as `*.test.ts`, run in Node rather than workerd, and stub the database — never point one at the shared Neon project (rule 11). |
 | Lint / format | `npm run lint` (ESLint 9 + `eslint-config-next`) |
 
 > **`main` is not actually protected, and cannot be on the current plan.**

@@ -46,6 +46,38 @@ describe("pageHtmlProblems", () => {
     ]);
   });
 
+  // The island allowance is not blanket. These are exactly the shapes
+  // `sanitize` strips `class` and `contenteditable` from, so accepting them
+  // would mean reporting a save that had quietly lost an attribute.
+  it("reports class on an element that is not a component island", () => {
+    expect(pageHtmlProblems('<p class="callout">Note</p>')).toEqual([
+      "class is not kept on <p>",
+    ]);
+  });
+
+  it("reports contenteditable outside a component island", () => {
+    expect(pageHtmlProblems('<h2 contenteditable="true">Title</h2>')).toEqual([
+      "contenteditable is not kept on <h2>",
+    ]);
+  });
+
+  it("reports class on a stray span no island would claim", () => {
+    expect(pageHtmlProblems('<span class="badge">New</span>')).toEqual([
+      "class is not kept on <span>",
+    ]);
+  });
+
+  it("reports a div that only looks like a component block", () => {
+    expect(pageHtmlProblems('<div data-block="component">Hi</div>')).toEqual([
+      "a component block needs a real data-component-id and a data-values object, or its attributes are dropped",
+    ]);
+  });
+
+  it("keeps class on a field span inside a component island", () => {
+    const island = `<div data-block="component" data-block-id="5f0e1b1a-0000-4000-8000-000000000000" data-component-id="5f0e1b1a-0000-4000-8000-000000000001" data-name="Hero" data-values="{&quot;heading&quot;:&quot;Hi&quot;}" contenteditable="false" class="comp-block"><span data-field="heading" data-label="Heading" class="comp-field">Hi</span></div>`;
+    expect(pageHtmlProblems(island)).toEqual([]);
+  });
+
   it("reports an attribute the editor would strip", () => {
     expect(pageHtmlProblems('<p onclick="steal()">hi</p>')).toEqual([
       "onclick is not kept on <p>",
@@ -66,6 +98,18 @@ describe("pageHtmlProblems", () => {
 
   it("ignores markup written inside a comment, which is not markup", () => {
     expect(pageHtmlProblems("<!-- <marquee>no</marquee> -->")).toEqual([]);
+  });
+
+  it("reports a valueless attribute the parser would report and sanitize drop", () => {
+    expect(pageHtmlProblems("<p hidden>Note</p>")).toEqual([
+      "hidden is not kept on <p>",
+    ]);
+  });
+
+  it("sees through an escaped url, which the parser would decode", () => {
+    expect(pageHtmlProblems('<a href="&#106;avascript:steal()">hi</a>')).toEqual([
+      'href="javascript:steal()" is not a safe link and would be removed',
+    ]);
   });
 
   it("ignores a stray closing tag, which has no content of its own", () => {

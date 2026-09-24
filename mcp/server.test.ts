@@ -26,6 +26,7 @@ vi.mock("../db", () => ({
 }));
 
 const db = await import("../db");
+const { LIMITS } = db;
 const { createCmsyMcpServer } = await import("./server");
 const handler = createMcpHandler(createCmsyMcpServer);
 
@@ -245,6 +246,18 @@ describe("set_page_blocks", () => {
 
     expect(result.isError).toBeUndefined();
     expect(db.setPageHtml).toHaveBeenCalledWith("p1", stored);
+  });
+
+  it("refuses a document too long to store, rather than trimming it", async () => {
+    vi.mocked(db.getPage).mockResolvedValue(PRICING);
+    const html = `<p>${"x".repeat(LIMITS.pageBody)}</p>`;
+
+    const result = await call("set_page_blocks", { space: "docs", page: "pricing", html });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(String(LIMITS.pageBody));
+    expect(result.content[0].text).toContain(String(html.length));
+    expect(db.setPageHtml).not.toHaveBeenCalled();
   });
 
   it("does not write to a page that does not exist", async () => {

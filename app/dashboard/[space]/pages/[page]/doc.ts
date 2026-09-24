@@ -12,31 +12,13 @@
  * same rules; only the rebuilding stays here, where a `DOMParser` exists.
  */
 
-import { DROP, STYLE_PROPERTIES, TAGS, unsafeUrl } from "@/db/page-html";
+import { DROP, esc, parseValues, STYLE_PROPERTIES, TAGS, unsafeUrl } from "@/db/page-html";
 
-export type Field = { key: string; label: string; fallback: string };
+// Re-exported because the editor has always reached for these through `./doc`,
+// and where they are defined is not the editor's business.
+export { esc, parseValues };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Attribute-safe escaping for the markup this module generates itself. */
-export const esc = (value: string) =>
-  value.replace(
-    /[&<>"']/g,
-    (char) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] as string,
-  );
-
-export const parseValues = (raw: string | null): Record<string, string> | null => {
-  try {
-    const parsed: unknown = JSON.parse(raw ?? "");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    return Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => [key, String(value)]),
-    );
-  } catch {
-    return null;
-  }
-};
 
 function clean(root: HTMLElement) {
   for (const el of [...root.querySelectorAll("*")]) {

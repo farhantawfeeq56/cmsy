@@ -741,6 +741,17 @@ function registerSetPageBlocks(server: McpServer) {
         );
       }
 
+      // Refused rather than trimmed: `setPageHtml` caps the body, and a document
+      // cut at an arbitrary offset can split a tag or an escaped attribute. A
+      // caller that is told nothing would have no way to know its write was
+      // mangled, which is worse than a refusal it can shorten and retry.
+      if (html.length > LIMITS.pageBody) {
+        return toolError(
+          `That document is ${html.length} characters; a page holds ${LIMITS.pageBody}. ` +
+            "Nothing was saved — split it across pages, or trim it and try again.",
+        );
+      }
+
       const replaced = await setPageHtml(page.id, html);
       return {
         content: [

@@ -235,13 +235,13 @@ export function pageHtmlProblems(html: string): string[] {
           inIsland,
           earned: attrs.has("data-block-name") || attrs.has("data-field"),
         });
-        // Named one by one, so an agent told "that class is not kept" can see
-        // which token of a mixed list was the problem.
-        const lost = value
-          .split(/\s+/)
-          .filter(Boolean)
-          .filter((token) => !kept.includes(token));
-        if (lost.length) problems.add(`class "${lost.join(" ")}" is not kept on <${rawTag}>`);
+        // One problem per token, the way the style branch above reports one per
+        // declaration. Joining them would name a class that never existed —
+        // `class="callout accent"` would come back as one class, "callout
+        // accent", which is a name nobody can act on.
+        for (const token of value.split(/\s+/).filter(Boolean)) {
+          if (!kept.includes(token)) problems.add(`class "${token}" is not kept on <${rawTag}>`);
+        }
       } else if (allowed.includes(key)) {
         if ((key === "href" || key === "src") && unsafeUrl(value)) {
           problems.add(`${key}="${value}" is not a safe link and would be removed`);

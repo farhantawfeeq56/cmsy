@@ -61,6 +61,13 @@ describe("pageHtmlProblems", () => {
     ]);
   });
 
+  it("reports each lost token separately, not glued into one bogus name", () => {
+    expect(pageHtmlProblems('<div class="callout accent card">Tier</div>')).toEqual([
+      'class "callout" is not kept on <div>',
+      'class "accent" is not kept on <div>',
+    ]);
+  });
+
   it("keeps the design system's classes with no island around them", () => {
     // A component template is judged on its own, so `card`, `btn` and `badge`
     // have to survive without the block that would normally carry them.

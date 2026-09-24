@@ -85,6 +85,20 @@ and `build`; to regenerate on its own:
 npm run design:sync
 ```
 
+## Toolchain
+
+Node 24 and npm 11.11 or newer (`.nvmrc`, and `devEngines` in `package.json`). `npm install`
+and `npm ci` refuse to run on anything else, because npm 10 and early npm 11 rewrite
+`package-lock.json` differently and every install would flip it back and forth.
+
+```bash
+nvm use            # reads .nvmrc
+npm -v             # must print 11.11 or newer; Node 24 ships one
+```
+
+If `npm -v` still prints 10.x under Node 24, a global npm elsewhere on your `PATH` is
+shadowing the bundled one. `npm config get prefix` shows where it lives.
+
 ## Running the MCP server
 
 The CMSy MCP server is served by the app itself, over Streamable HTTP at

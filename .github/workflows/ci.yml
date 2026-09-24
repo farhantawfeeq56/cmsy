@@ -28,10 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Matches local development until #19 pins it in package.json.
+      # .nvmrc is the one place the Node version is set; package.json's
+      # devEngines makes npm ci fail on a Node or npm it does not accept.
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install

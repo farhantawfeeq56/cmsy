@@ -31,7 +31,7 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 | Dev A / agent | Aathil Felix C — `@AathilFelix` / Claude Code |
 | Dev B / agent | Farhan Tawfeeq — `@farhantawfeeq56` / Pi (DeepSeek) |
 | Stack | TypeScript · Next.js 16 App Router (React 19, RSC) built with vinext · Cloudflare Workers · Neon Postgres · Tailwind v4 |
-| Install | `npm ci` |
+| Install | `npm ci` on Node 24 / npm 11.11+ (`nvm use`; enforced by `devEngines`, see #19) |
 | Run | `npm run dev` (Next dev server) — or `npm run dev:vinext` (port 3001) to match the deployed Workers runtime |
 | Test | **none yet** — no test runner is configured. §3.3's "add or update tests" rule cannot be honoured until one exists. |
 | Lint / format | `npm run lint` (ESLint 9 + `eslint-config-next`) |

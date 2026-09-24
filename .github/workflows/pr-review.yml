@@ -2,7 +2,9 @@ name: PR review
 
 # Gives every PR into main an automated first-pass review: at most two
 # recommendations, each saying what is wrong, why it matters and how to fix
-# it. It is a pointer for the human reviewer, not a substitute for one, and it
+# it. In the fast lane it is the only review a PR gets, and the author's agent
+# must fix or answer each point; in the human lane it is a pointer for the
+# other dev, not a substitute for their Approve (AGENTS.md §3.7, #83). It
 # never fails the PR. See #56.
 #
 # It authenticates with a Claude subscription token, so each review counts

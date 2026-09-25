@@ -5,8 +5,8 @@ name: CI
 # and posts no log to GitHub on failure, so this is the first place a broken
 # change becomes visible with a readable error. See issue #40.
 #
-# The check is advisory until branch protection exists to make it required
-# (#23).
+# `check` is a required check on main (.github/rulesets/main-protection.json,
+# #83), so a red run blocks the merge.
 
 on:
   pull_request:

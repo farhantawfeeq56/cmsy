@@ -1,0 +1,30 @@
+# The human lane (#83). A PR that touches any path below needs an Approve from
+# the other dev before it can merge; every other PR is in the fast lane and
+# needs none. See AGENTS.md §3.7.
+#
+# Both devs are listed on every line so the rule is symmetric: GitHub never
+# counts an author's own approval, so the approval has to come from the other
+# one. GitHub reads this file from the PR's base branch, so a PR cannot take
+# itself out of the lane by editing it.
+#
+# scripts/protection.mjs reads this file too, and accepts only anchored paths:
+# `/file` or `/folder/`. No wildcards, so both readers agree on what matches.
+
+# The working agreement, CI, this file and the ruleset spec.
+/AGENTS.md                @AathilFelix @farhantawfeeq56
+/.github/                 @AathilFelix @farhantawfeeq56
+/scripts/protection.mjs   @AathilFelix @farhantawfeeq56
+
+# The production database.
+/db/schema.sql            @AathilFelix @farhantawfeeq56
+/db/migrate.mjs           @AathilFelix @farhantawfeeq56
+
+# Agent authentication.
+/mcp/tokens.ts            @AathilFelix @farhantawfeeq56
+/mcp/endpoint.ts          @AathilFelix @farhantawfeeq56
+/app/api/mcp/             @AathilFelix @farhantawfeeq56
+
+# Deploy config and dependencies.
+/wrangler.jsonc           @AathilFelix @farhantawfeeq56
+/package.json             @AathilFelix @farhantawfeeq56
+/package-lock.json        @AathilFelix @farhantawfeeq56

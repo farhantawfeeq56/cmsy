@@ -163,33 +163,28 @@ describe("driftFrom", () => {
     expect(driftFrom(spec, applied, undefined)).toEqual([expect.stringMatching(/enforcement is unset/)]);
   });
 
-  it("reports code-owner review being turned off", () => {
+  it("reports code-owner review being turned on", () => {
     const live = structuredClone(applied);
-    live.find((r: { type: string }) => r.type === "pull_request").parameters.require_code_owner_review = false;
+    live.find((r: { type: string }) => r.type === "pull_request").parameters.require_code_owner_review = true;
     expect(driftFrom(spec, live, "active")).toEqual([
-      "pull_request: require_code_owner_review is false, spec says true",
+      "pull_request: require_code_owner_review is true, spec says false",
     ]);
   });
 
-  it("reports a required check being removed", () => {
+  it("reports a rule the spec does not have", () => {
     const live = structuredClone(applied);
-    const checks = live.find((r: { type: string }) => r.type === "required_status_checks").parameters;
-    checks.required_status_checks = checks.required_status_checks.filter(
-      (c: { context: string }) => c.context !== "review-lane",
-    );
-    expect(driftFrom(spec, live, "active")).toEqual([expect.stringMatching(/^required_status_checks: required_status_checks is/)]);
-  });
-
-  it("reports a whole rule missing, and a rule the spec does not have", () => {
-    const live = applied.filter((r: { type: string }) => r.type !== "required_status_checks");
     live.push({ type: "required_signatures", ruleset_id: 1 });
     expect(driftFrom(spec, live, "active")).toEqual([
-      "required_status_checks: missing on main",
       "required_signatures: enforced on main but not in the spec",
     ]);
   });
 
-  it("reports today's live ruleset, 0 approvals with no code-owner review or required checks", () => {
+  it("reports a whole spec rule missing", () => {
+    const live = applied.filter((r: { type: string }) => r.type !== "non_fast_forward");
+    expect(driftFrom(spec, live, "active")).toEqual(["non_fast_forward: missing on main"]);
+  });
+
+  it("matches main as it is today, so main is not drifted (#85, #86)", () => {
     const today = [
       { type: "deletion" },
       { type: "non_fast_forward" },
@@ -205,11 +200,6 @@ describe("driftFrom", () => {
         },
       },
     ];
-    expect(driftFrom(spec, today, "active")).toEqual([
-      "pull_request: required_approving_review_count is 0, spec says 1",
-      "pull_request: require_code_owner_review is false, spec says true",
-      "pull_request: dismiss_stale_reviews_on_push is false, spec says true",
-      "required_status_checks: missing on main",
-    ]);
+    expect(driftFrom(spec, today, "active")).toEqual([]);
   });
 });

@@ -39,17 +39,17 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > **`main` is protected by the ruleset in [`.github/rulesets/main-protection.json`](.github/rulesets/main-protection.json).**
 > That file is the agreed protection; the live ruleset `main-protection` (id `23748284`, targets
 > `~DEFAULT_BRANCH`, `bypass_actors: []`) must match it. It refuses deletions and non-fast-forward
-> pushes, and requires a pull request that passes the two review lanes of §3.7:
+> pushes, and requires a pull request. **Nothing else.** No approving review, no code-owner
+> review, no required status check — the two lanes of §3.7 and
+> [`.github/CODEOWNERS`](.github/CODEOWNERS) are the process we agreed to follow, not a gate
+> GitHub holds shut (#86).
 >
-> - **1 approving review**: in the fast lane the review bot's Approve is enough; in the human lane
->   it must be the other dev's (#83);
-> - **code-owner review**, so a PR touching a path in [`.github/CODEOWNERS`](.github/CODEOWNERS)
->   needs the other dev's Approve, and **stale approvals are dismissed** on a new push;
-> - **required checks**, all pinned to GitHub Actions so nothing else can post them: `check` (CI),
->   `applied` (schema gate, §3.3), `review-lane` (§3.7) and `protection` (below).
+> Concretely: a PR that touches `db/schema.sql` merges on green CI and the author's judgement,
+> exactly like a PR that touches a button's padding. Follow the lanes anyway — the human lane is
+> where a mistake reaches production — but a missing Approve is a conversation, not a blocker.
 >
-> **Changing the protection is a PR, then an apply.** Edit the spec in a PR; it is in the human
-> lane, so the other dev approves it. Only the repo admin (`@farhantawfeeq56`) can apply it:
+> **Changing the protection is a PR, then an apply.** Edit the spec in a PR and get it merged;
+> only the repo admin (`@farhantawfeeq56`) can apply it:
 >
 > ```bash
 > gh api -X PUT repos/farhantawfeeq56/cmsy/rulesets/23748284 --input .github/rulesets/main-protection.json
@@ -58,11 +58,13 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > When the change **adds a required check**, merge first and apply second. A check exists only in
 > branches that contain its workflow, so applying first leaves every open PR waiting on a status it
 > can never report. After applying, rebase open PRs on `main` so they pick the new workflow up.
+> There is no required check today, so the `check` and `applied` runs are a signal you read rather
+> than a wall you hit: **do not merge over a red `check`** (§3.8), but GitHub will not stop you.
 >
 > Never change the ruleset in Settings without that PR. The `Branch protection` workflow compares
 > the live rules with the spec on every PR, every push to `main` and daily. Any difference fails the
-> `protection` check, which blocks every PR, and opens an issue tagging both devs. It cannot see
-> the bypass list (that needs admin), so applying the spec is also how the list is kept empty.
+> `protection` check and opens an issue tagging both devs. It cannot see the bypass list (that
+> needs admin), so applying the spec is also how the list is kept empty.
 >
 > Check it yourself rather than trust it, because it has been wrong before:
 >
@@ -286,7 +288,10 @@ Then open a PR **into `main`**:
 ### 3.7 Review
 
 Every PR is in one of two lanes, decided by the files it touches. The `review-lane` check says
-which lane a PR is in, and what it is still missing.
+which lane a PR is in, and what it is still missing. **It fails, but it does not block the merge**
+(#86): GitHub enforces no approval on `main`, so a human-lane PR may merge without one. The lanes
+are the process, and skipping the Approve there means the other dev has not seen a change that
+sets the rules, touches the production database, handles agent credentials or alters the deploy.
 
 | | **Fast lane** | **Human lane** |
 |---|---|---|
@@ -315,8 +320,8 @@ which lane a PR is in, and what it is still missing.
   Use it for a real objection, and say what would resolve it.
 - **Changing the lanes is itself human-lane work.** `CODEOWNERS`, the ruleset spec and the checks
   live under `.github/` and `scripts/protection.mjs`, so a PR that moves a path out of the human
-  lane needs the other dev's Approve. GitHub reads `CODEOWNERS` from the base branch, so a PR
-  cannot take itself out of the lane.
+  lane is a PR to talk about first. GitHub reads `CODEOWNERS` from the base branch, and nothing
+  stops a PR from editing it, so the rule is kept by the two devs rather than by a check (#86).
 - **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. Findings posted as a plain PR comment leave the PR with no review decision, so nobody can tell whether it is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
 - Reviewers: be specific, kind, and actionable. Distinguish **blocking** issues from `nit:` suggestions. Ask questions instead of assuming mistakes.
 - Authors: respond to every comment, the bot's included. Fix, or explain why not. Push fixes as new commits (don't rewrite history mid-review). In the human lane, re-request review when ready.
@@ -329,7 +334,9 @@ which lane a PR is in, and what it is still missing.
   gh pr view <number> --json statusCheckRollup,reviewDecision,author,comments
   ```
   Every check must pass, `review-lane` included (it covers the approval in the human lane and any
-  change request in either lane). `reviewDecision` must be `APPROVED`: the bot's Approve in the
+  change request in either lane). **That is a rule you keep, not one GitHub enforces** — nothing is
+  a required check (#86), so a red `review-lane` fails no merge but still means the human lane is
+  owed an Approve. `reviewDecision` must be `APPROVED`: the bot's Approve in the
   fast lane, the other dev's in the human lane. `author` must not be you. Every review-bot point must be
   fixed or answered. Your human must also have told you to merge this PR. If any of these fails,
   stop and say which one.

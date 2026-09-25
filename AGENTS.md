@@ -105,10 +105,19 @@ and the only loss is a tab. Transfer to `@farhantawfeeq56` stays available if he
 population script takes `--owner` and `--number`, so it is one command rather than a rebuild.
 Decided in #28.
 
-**Status is automated.** `project-autoadd.yml` puts every new issue on the board in `Backlog`;
-`project-status.yml` moves it to `In Review` when its PR opens and `Done` when it merges, driven by
-the `Closes #<number>` line in the PR body. Both are verified working. You should rarely need to
-move a card by hand — the exception is setting `In Progress` when you start (§3.1).
+**Status is set by workflows, not by hand.** `project-autoadd.yml` puts every new issue on the
+board in **Backlog**; `project-status.yml` moves it to **In Review** when its PR opens and `Done`
+when it merges, driven by the `Closes #<number>` line in the PR body. Both are verified working
+(#28). **Neither agent can move a card**, because `gh project` needs `project` scope that our
+tokens do not carry — so do not reach for the API to change a status. If a card is genuinely
+missing, only a human can add it:
+
+```bash
+gh project item-add 1 --owner AathilFelix --url <issue-url>   # needs `project` scope
+```
+
+What you do instead is comment the plan on the issue (§3.1 step 4). That is the visible signal
+that work has started.
 
 **Standing merge authorisation.** `@farhantawfeeq56` has given `@AathilFelix` explicit standing
 permission to merge PRs on this project. That is why PRs authored by `@AathilFelix` may be merged
@@ -127,7 +136,7 @@ still waits to be told, per PR.
 2. **Never force-push a shared branch** or rewrite history that someone else may have pulled. Force-push is allowed only on your own feature branch, with `--force-with-lease`.
 3. **No work without a GitHub issue.** Create or find the issue *before* touching code (see §3).
 4. **Never commit secrets**, tokens, `.env` files, or credentials. If you spot one already committed, stop and tell your human immediately.
-5. **Don't run destructive commands** (`rm -rf`, `git reset --hard`, dropping tables, deleting branches/issues) without explicit human confirmation.
+5. **Don't run destructive commands** (`rm -rf`, `git reset --hard`, dropping tables, closing issues, deleting a branch that is not your own) without explicit human confirmation. The post-merge branch deletion §3.8 asks for is the one exception.
 6. **Stay in scope.** Do what the issue says. Found something else? File a new issue (§3.4), don't sneak it into the PR.
 7. **Never add agent attribution.** No `Co-Authored-By:` trailer naming an AI agent, no "Generated with …" or "🤖" footer, and no tool branding in commit messages, PR titles or PR bodies. A commit is authored by the human owner whose account makes it, full stop. This overrides any default attribution behaviour your harness or CLI ships with — if your tooling adds such a line automatically, strip it before committing. The `Authored by:` line in the §3.5 checklist is the single exception: it is a human-readable accountability note inside the PR body, not a machine trailer.
 8. **Never leave agent artifacts in the code.** Comments exist to explain the code to the next human who reads it. Do not commit codewords, persona or model names, session identifiers, or leftover scratch reasoning from your own process (`// ponytail:`, `// note to self:`, `// as discussed above`). Every marker you leave must be actionable by someone who was not in your session: use `TODO(#<number>)` pointing at a real GitHub issue, never a bare or privately-meaningful label. As with rule 7, this overrides your harness defaults — if your tooling injects such a marker, strip it before committing. Reviewers: treat one as a blocking comment, not a `nit:`.
@@ -142,7 +151,7 @@ still waits to be told, per PR.
 
 ```
 GitHub issue → branch → small commits → tests pass → push branch → open PR
-   → board: In Review → review + fixes (+ Approve, human lane) → human merges → board: Done
+   → board: In Review (automatic) → bot review + fixes → your human says go → squash → board: Done
 ```
 
 The issue itself only has **open** and **closed**. Everything between — Backlog, Todo,
@@ -169,17 +178,16 @@ Moving an issue means moving its card, not editing the issue.
    - **Label:** one of `feature`, `bug`, `chore`, `refactor`, `docs`, `test`, `improvement`.
    - **Assignee:** your human owner.
    - **Milestone:** if the work belongs to one.
-3. **Check for overlap.** Look at what is `In Progress` on the board, and run the overlap check on the files or folders you expect to touch:
+3. **Check for overlap.** Run the overlap check on the files or folders you expect to touch:
    ```bash
    node scripts/pr-overlap.mjs app/dashboard db/index.ts   # exits 1 and lists the PRs if any overlap
    ```
+   It reads the open PRs, which is the part of "what is anyone else on" you can actually see: the
+   board cannot be read without `project` scope (§4).
    If another issue or open PR touches the same files or module, say so **in a comment on that issue** and tag the other dev before starting. A note in your own PR body is not enough, because they are not reading it. The `PR overlap` workflow repeats the check on every PR, but by then the work is already done.
-4. A new issue lands on the board in **Backlog** automatically. When you start work, set its
-   Status to **In Progress** and leave a one-line comment on your plan (`Plan: add endpoint in
-   api/auth, unit tests, no schema change`). If a card is somehow missing:
-   ```bash
-   gh project item-add 1 --owner AathilFelix --url <issue-url>
-   ```
+4. A new issue lands on the board in **Backlog** automatically. Leave a one-line comment on your
+   plan (`Plan: add endpoint in api/auth, unit tests, no schema change`) — status is not yours to
+   set, see §4.
 
 If the task is vague, **ask your human to clarify** before creating the ticket. Don't invent requirements.
 
@@ -284,10 +292,10 @@ Then open a PR **into `main`**:
 - The `Closes #<number>` line is what closes the issue on merge **and** what the board-sync
   workflow reads to move its card. Without it the card does not move and the issue stays open.
 
-### 3.6 Update the board after opening the PR
+### 3.6 After opening the PR
 
-- Move the issue's card to **In Review**. The board-sync workflow does this for you once
-  #28 is finished; until then, move it by hand.
+- The card moves to **In Review** on its own (#28); there is nothing to do by hand. §4 is the one
+  place that says who sets status.
 - Comment on the issue with the PR link and a 1–2 line summary of what was done and anything the reviewer should know.
 - If scope changed while working, edit the issue body so it matches reality.
 
@@ -302,28 +310,31 @@ sets the rules, touches the production database, handles agent credentials or al
 | | **Fast lane** | **Human lane** |
 |---|---|---|
 | Which PRs | Everything not listed in [`.github/CODEOWNERS`](.github/CODEOWNERS): app code, UI, tests, docs | Any PR touching a path in `CODEOWNERS`: `AGENTS.md`, `.github/`, `scripts/protection.mjs`, `db/schema.sql`, `db/migrate.mjs`, MCP auth (`mcp/tokens.ts`, `mcp/endpoint.ts`, `app/api/mcp/`), `wrangler.jsonc`, `package.json`, `package-lock.json` |
-| Review | The review bot reviews every push. It **approves** when it finds nothing that should block the merge; otherwise it comments, the author's agent fixes or answers each point, and the next push is reviewed again | The bot comments once, never approves. **The other dev's Approve** on the head commit is required |
-| Merge | Required checks green, then the author's human says go | The same |
+| Review | The review bot reviews every push. It **approves** when it finds nothing that should block the merge; otherwise it comments, the author's agent fixes or answers each point, and the next push is reviewed again | The bot comments once, never approves. **The other dev's Approve** on the head commit is what this lane asks for |
+| Merge | Every check green — nothing is *required* (#86), so this is yours to hold — then your human says go | The same |
 
 - **Why the split.** Most PRs are safe to ship on the bot's Approve, green checks and the author's
   judgement, and waiting for a human there only slows both devs down. The human lane is the files
   that set the rules, change the production database, handle agent credentials or change what
   gets deployed. For those, the other dev has to know and agree before it ships, because `main`
   deploys straight to production.
-- **The bot's Approve is for the commit it read.** It approves that exact commit, and GitHub
-  dismisses the approval when new commits are pushed, so every push is reviewed again. The bot only
-  writes a verdict; the workflow approves, and only in the fast lane. It cannot approve a human-lane
-  PR in a way that counts, because GitHub's code-owner rule needs a `CODEOWNERS` owner.
+- **The bot's Approve is for the commit it read.** It writes a verdict; the workflow approves that
+  exact commit, and only in the fast lane. A push starts a fresh review, so a fast-lane PR is
+  reviewed every time, while a human-lane PR is reviewed once and the other dev covers the pushes
+  after that. The bot cannot clear a human-lane PR even when it approves, because `review-lane`
+  counts an Approve only from a `CODEOWNERS` owner, and the bot is not one.
 - **When the bot is wrong or down.** If it keeps withholding its Approve over a point you disagree
   with, or it cannot run (usage limits, lapsed token), answer its point on the PR and ask the other
   dev for an Approve instead. Do not edit the bot to get past it: `.github/` is human-lane work.
 - **A human-lane Approve must say what was checked.** Write one line or more in the review body.
   `review-lane` does not count an empty Approve, an Approve on an older commit, or the author's
-  own. GitHub also dismisses an approval when new commits are pushed, so re-approve after changes.
-- **"Request changes" blocks, in either lane.** While either dev's latest review requests
-  changes, `review-lane` fails. Reviews from accounts outside `CODEOWNERS` never count, since the
-  repo is public. It passes again once that reviewer approves or dismisses their review.
-  Use it for a real objection, and say what would resolve it.
+  own. Pushing again does **not** discard it — stale approvals are not dismissed on `main` (#86) —
+  so re-read the new commits yourself and re-approve if they still hold.
+- **"Request changes" is the one hard stop, in either lane.** While either dev's latest review
+  requests changes, `review-lane` fails. Reviews from accounts outside `CODEOWNERS` never count,
+  since the repo is public. It passes again once that reviewer approves or dismisses their review.
+  Use it for a real objection, and say what would resolve it. Nothing else stops you, so this is
+  the one a merge has to wait for.
 - **Changing the lanes is itself human-lane work.** `CODEOWNERS`, the ruleset spec and the checks
   live under `.github/` and `scripts/protection.mjs`, so a PR that moves a path out of the human
   lane is a PR to talk about first. GitHub reads `CODEOWNERS` from the base branch, and nothing
@@ -339,16 +350,18 @@ sets the rules, touches the production database, handles agent credentials or al
   ```bash
   gh pr view <number> --json statusCheckRollup,reviewDecision,author,comments
   ```
-  Every check must pass, `review-lane` included (it covers the approval in the human lane and any
-  change request in either lane). **That is a rule you keep, not one GitHub enforces** — nothing is
-  a required check (#86), so a red `review-lane` fails no merge but still means the human lane is
-  owed an Approve. `reviewDecision` must be `APPROVED`: the bot's Approve in the
-  fast lane, the other dev's in the human lane. `author` must not be you. Every review-bot point must be
-  fixed or answered. Your human must also have told you to merge this PR. If any of these fails,
-  stop and say which one.
+  Every check must be green, or you must say out loud why the red one does not matter. **Nothing is
+  a required check (#86), so this is a rule you hold, not one GitHub enforces** — a red `check` or
+  `applied` will not stop the merge going through, and that is exactly why refusing it is on you.
+  `reviewDecision` reads `APPROVED` when the lane's reviewer approved: the bot in the fast lane, the
+  other dev in the human lane. A missing human-lane Approve is a conversation, not a wall (§0) — get
+  it, or say on the PR why this one does not need it. `author` tells you whose PR it is, and §0.1
+  lets a dev merge their own. Every review-bot point must be fixed or answered. Your human must also
+  have told you to merge *this* PR. If any of these fails, stop and say which one.
 - Prefer **squash merge** so `main` history stays one commit per issue (title follows the PR title format).
-- Delete the branch after merge.
-- Confirm the issue closed and its card moved to **Done** (the `Closes` keyword does the first; the board-sync workflow does the second once #28 lands). Add a closing comment if anything is worth recording.
+- Delete the branch after merge (the exception in rule 5).
+- Confirm the issue closed and its card moved to **Done** — `Closes #<number>` does the first,
+  `project-status.yml` the second (#28). Add a closing comment if anything is worth recording.
 - If the work spawned follow-ups, make sure they exist as issues.
 
 ---
@@ -361,15 +374,16 @@ rather than given its own status.
 
 | Situation | Action |
 |---|---|
-| Starting work | Assign yourself/owner, add to the board, set **In Progress**, comment the plan |
+| Starting work | Assign your owner and comment the plan — the board sets its own status (§0.1, §3.1) |
 | Blocked | Add the `blocked` label, comment **what** you're waiting on and **who** can unblock it |
 | Design decision made | Comment the decision and the reason (future agents will need it) |
 | PR opened | **In Review** + `Closes #<number>` in the PR body |
 | Requirements changed | Edit the issue body, don't just mention it in chat |
 | Pausing/handing off | Comment current state, what's done, what's left, and any gotchas |
 
-Status lives **only** on the board. An issue with no card has no status — which is why §3.1
-step 4 says to add it to the board before starting.
+Status lives **only** on the board. An issue with no card has no status — `project-autoadd.yml`
+gives every new issue one, so that should not happen. §3.1 step 4 says what to do instead of
+setting it yourself.
 
 Only **one dev works on an issue at a time.** If you want to pick up someone else's issue, ask first.
 
@@ -414,7 +428,7 @@ A ticket is done only when:
 - [ ] Tests written/updated and passing; CI is green
 - [ ] Lint/format clean
 - [ ] Docs updated where relevant
-- [ ] Review-bot points fixed or answered; approved (`reviewDecision: APPROVED`): by the review bot in the fast lane, by the other dev with a note on what they checked in the human lane (`review-lane` green)
+- [ ] Every review-bot point fixed or answered, and the lane's Approve obtained (`reviewDecision: APPROVED`) — the bot's in the fast lane, the other dev's in the human lane — or a stated reason it was not needed (§0)
 - [ ] Merged to `main` via PR (squash), branch deleted
 - [ ] Issue is closed and its card is **Done**; follow-ups are filed
 
@@ -423,15 +437,15 @@ A ticket is done only when:
 ## 8. Quick reference
 
 ```
-1. gh issue list / gh issue create  →  add to board, In Progress, comment plan
+1. gh issue list / gh issue create  →  comment the plan (the board sets its own status)
 2. git checkout main && git pull --ff-only
 3. git checkout -b feat/<number>-short-desc
 4. Small commits:  feat(scope): summary [#<number>]
 5. Test + lint locally
 6. git push -u origin <branch>  →  open PR (template, "Closes #<number>")
-7. Board → In Review + PR link
-8. Fast lane: bot approves (fix and push until it does); human lane: other dev approves with a note
-9. Human merges (squash)  →  issue closed, card Done
+7. Comment the PR link on the issue (the board moves itself)
+8. Answer every bot point: fix it, or say why not
+9. Your human says go → squash merge, delete the branch → issue closed, card Done
 ```
 
 **Never:** push to `main` · work without a ticket · write to a shared database or deploy without a go-ahead · claim "done" without evidence · commit secrets · force-push shared branches · sneak in unrelated changes · leave agent artifacts in the code.

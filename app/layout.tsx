@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { Agentation } from "agentation";
+import { AnnotationToolbar } from "./annotation-toolbar";
 import "./globals.css";
-
-/** Annotation toolbar: local dev and Vercel preview only, never production. */
-const feedback =
-  process.env.NODE_ENV === "development" || process.env.VERCEL_ENV === "preview";
 
 const nohemi = localFont({
   src: "./fonts/Nohemi-VF.ttf",
@@ -33,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {children}
-        {feedback && <Agentation />}
+        <AnnotationToolbar />
       </body>
     </html>
   );

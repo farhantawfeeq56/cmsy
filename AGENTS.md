@@ -48,6 +48,12 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > exactly like a PR that touches a button's padding. Follow the lanes anyway — the human lane is
 > where a mistake reaches production — but a missing Approve is a conversation, not a blocker.
 >
+> **There is exactly one protection layer: the ruleset above.** Leave *Settings → Branches* empty.
+> A classic branch protection rule on `main` outlived #77 with a 1-approval requirement nobody had
+> seen — `protection.mjs drift` reads rulesets only — and it silently blocked every merge until #87
+> deleted it. If `gh pr merge` ever says the base branch policy prohibits the merge while
+> `rules/branches/main` says 0 approvals, look for a classic rule before anything else.
+>
 > **Changing the protection is a PR, then an apply.** Edit the spec in a PR and get it merged;
 > only the repo admin (`@farhantawfeeq56`) can apply it:
 >

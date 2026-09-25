@@ -376,6 +376,11 @@ sets the rules, touches the production database, handles agent credentials or al
 Work that is abandoned is closed as **not planned** (`gh issue close --reason "not planned"`)
 rather than given its own status.
 
+**Nobody sets `Todo` or `In Progress`.** The automations only ever set `Backlog`, `In Review` and
+`Done`, and the agents cannot set anything (§0.1). Those two exist for a human to use by hand if
+they want to. A card that goes straight from `Backlog` to `In Review` is normal, not a missing
+status — do not go looking for who dropped it.
+
 | Situation | Action |
 |---|---|
 | Starting work | Assign your owner and comment the plan — the board sets its own status (§0.1, §3.1) |

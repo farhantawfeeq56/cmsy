@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listMcpTokens, listSpaces, type McpToken } from "@/db";
 import { ago } from "./ago";
+import { GlobalSearch } from "./global-search";
 
 // The dashboard is per-request data, never prerendered.
 export const dynamic = "force-dynamic";
@@ -52,6 +53,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           CMSy
         </Link>
         <AgentStatus agent={agent} />
+        <GlobalSearch />
         <nav className="mt-4 flex flex-wrap gap-1 lg:mt-6 lg:flex-col">
           {/* No Home tab: the logo is the way back to the dashboard. */}
           {/* Connect agent lives above, under the logo. */}

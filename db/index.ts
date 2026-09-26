@@ -37,6 +37,55 @@ export type Space = {
   updated_at: string;
 };
 
+export type SearchHit = {
+  kind: "space" | "page" | "component";
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+};
+
+/**
+ * `%` and `_` are LIKE wildcards, so a term that contains one is escaped rather
+ * than allowed to match every row. Returns null for a term too short to be worth
+ * a query.
+ */
+export function likePattern(term: string): string | null {
+  const trimmed = term.trim().slice(0, 60);
+  if (trimmed.length < 2) return null;
+  return `%${trimmed.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+/**
+ * One query for the sidebar search: spaces by name, pages by title, components
+ * by name. The href is built here so the client never has to know a route.
+ */
+export async function searchEverything(term: string, limit = 12): Promise<SearchHit[]> {
+  const pattern = likePattern(term);
+  if (!pattern) return [];
+
+  return rows<SearchHit>(db()`
+    select * from (
+      select 'space' as kind, s.id, s.name as title, '' as subtitle,
+             '/dashboard/' || s.slug as href
+      from spaces s
+      where s.name ilike ${pattern}
+      union all
+      select 'page', p.id, p.title, s.name,
+             '/dashboard/' || s.slug || '/pages/' || p.slug
+      from pages p join spaces s on s.id = p.space_id
+      where p.title ilike ${pattern}
+      union all
+      select 'component', c.id, c.name, s.name,
+             '/dashboard/' || s.slug || '?view=design#components'
+      from components c join spaces s on s.id = c.space_id
+      where c.name ilike ${pattern}
+    ) hits
+    order by kind, title
+    limit ${limit}
+  `);
+}
+
 export type ActivityItem = {
   id: string;
   kind: "page" | "component";

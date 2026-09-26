@@ -1,11 +1,5 @@
 import Link from "next/link";
-import {
-  listMcpTokens,
-  listRecentActivity,
-  listSpaces,
-  type ActivityItem,
-  type McpToken,
-} from "@/db";
+import { listRecentActivity, listSpaces, type ActivityItem } from "@/db";
 import { ago } from "./ago";
 import { createSpace } from "./actions";
 import { SpaceRail } from "./space-rail";
@@ -19,45 +13,8 @@ const KIND_LABEL: Record<ActivityItem["kind"], string> = {
 
 const initial = (value: string) => value.trim().charAt(0).toUpperCase() || "?";
 
-/**
- * Whether an agent is talking to CMSy, and the way to the page that changes it.
- * Both states link there, because this is the only way in — the sidebar tab is
- * gone.
- */
-function AgentStatus({ agent }: { agent: { name: string; last_used_at: string } | undefined }) {
-  if (!agent) {
-    return (
-      <Link href="/dashboard/connect" className="btn btn-quiet border border-line">
-        Connect agent
-      </Link>
-    );
-  }
-
-  return (
-    <Link
-      href="/dashboard/connect"
-      title={`${agent.name} · last used ${ago(agent.last_used_at)}`}
-      className="badge"
-    >
-      <span aria-hidden className="size-1.5 rounded-full bg-ink" />
-      Agent connected
-    </Link>
-  );
-}
-
 export default async function DashboardPage() {
-  const [spaces, activity, tokens] = await Promise.all([
-    listSpaces(),
-    listRecentActivity(),
-    listMcpTokens(),
-  ]);
-
-  // A live token that has been used means an agent is talking to us. Issuing one
-  // is not the same thing, and a revoked one never counts.
-  const agent = tokens.find(
-    (token): token is McpToken & { last_used_at: string } =>
-      !token.revoked_at && token.last_used_at !== null,
-  );
+  const [spaces, activity] = await Promise.all([listSpaces(), listRecentActivity()]);
 
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-10">
@@ -72,8 +29,6 @@ export default async function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <AgentStatus agent={agent} />
-
           <form id="new-space" action={createSpace} className="scroll-mt-24">
             <button type="submit" className="btn shrink-0 justify-center">
               New Space

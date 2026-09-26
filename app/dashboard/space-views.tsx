@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import type { Space } from "@/db";
 
 /**
@@ -16,6 +16,71 @@ const meta = (space: Space) =>
     space.component_count === 1 ? "component" : "components"
   }`;
 
+type RailRef = RefObject<HTMLUListElement | null>;
+
+/** The rail's prev/next controls. Dimmed at each end so a click never does nothing. */
+const NavButton = ({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) => (
+  <button
+    type="button"
+    aria-label={label}
+    disabled={disabled}
+    onClick={onClick}
+    className="flex size-9 items-center justify-center rounded-full border border-line bg-card text-lg leading-none text-ink transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:opacity-30 disabled:hover:border-line"
+  >
+    <span aria-hidden>{children}</span>
+  </button>
+);
+
+/**
+ * Whether the rail can still move each way, read from the DOM rather than
+ * mirrored into state: scroll position is the browser's, not ours.
+ * `useSyncExternalStore` is the same pattern `annotation-toolbar.tsx` uses.
+ */
+function useRailEdges(railRef: RailRef) {
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      const rail = railRef.current;
+      if (!rail) return () => {};
+
+      rail.addEventListener("scroll", notify, { passive: true });
+      // Catches the first measurement and any resize, where `scroll` is silent.
+      const observer = new ResizeObserver(notify);
+      observer.observe(rail);
+
+      return () => {
+        rail.removeEventListener("scroll", notify);
+        observer.disconnect();
+      };
+    },
+    [railRef],
+  );
+
+  // A string, so the snapshot compares by value and cannot loop.
+  const snapshot = useSyncExternalStore(
+    subscribe,
+    () => {
+      const rail = railRef.current;
+      if (!rail) return "false|false";
+      const end = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 1;
+      return `${rail.scrollLeft > 1}|${!end}`;
+    },
+    () => "false|false",
+  );
+
+  const [prev, next] = snapshot.split("|");
+  return { prev: prev === "true", next: next === "true" };
+}
+
 const card = (space: Space, i: number, className = "") =>
   `font-primary flex flex-col justify-end rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform ${
     TILES[i % TILES.length]
@@ -25,10 +90,19 @@ const card = (space: Space, i: number, className = "") =>
 const track = (
   spaces: Space[],
   slide: (space: Space, index: number) => ReactNode,
-  { className = "", slideClass }: { className?: string; slideClass?: (index: number) => string } = {},
+  {
+    railRef,
+    className = "",
+    slideClass,
+  }: {
+    railRef: RailRef;
+    className?: string;
+    slideClass?: (index: number) => string;
+  },
 ) => (
   <ul
-    className={`-mx-6 mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pt-4 pb-4 ${className}`}
+    ref={railRef}
+    className={`-mx-6 mt-3 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pt-4 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
   >
     {spaces.map((space, index) => (
       <li
@@ -41,7 +115,7 @@ const track = (
   </ul>
 );
 
-const deck = (spaces: Space[]) =>
+const deck = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -53,10 +127,10 @@ const deck = (spaces: Space[]) =>
         <span className="mt-1 text-xs text-ink/60">{meta(space)}</span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-14" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-14" : "") },
   );
 
-const tight = (spaces: Space[]) =>
+const tight = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -68,10 +142,10 @@ const tight = (spaces: Space[]) =>
         <span className="mt-1 block truncate text-xs text-ink/50">{meta(space)}</span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-28" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-28" : "") },
   );
 
-const wide = (spaces: Space[]) =>
+const wide = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -86,10 +160,10 @@ const wide = (spaces: Space[]) =>
         </span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-24" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-24" : "") },
   );
 
-const tall = (spaces: Space[]) =>
+const tall = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -103,10 +177,10 @@ const tall = (spaces: Space[]) =>
         </span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-10" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-10" : "") },
   );
 
-const numbered = (spaces: Space[]) =>
+const numbered = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -123,10 +197,10 @@ const numbered = (spaces: Space[]) =>
         </span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-16" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-16" : "") },
   );
 
-const spines = (spaces: Space[]) =>
+const spines = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space) => (
@@ -146,10 +220,10 @@ const spines = (spaces: Space[]) =>
         </span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-44" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-44" : "") },
   );
 
-const staggered = (spaces: Space[]) =>
+const staggered = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -161,13 +235,13 @@ const staggered = (spaces: Space[]) =>
         <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
       </Link>
     ),
-    { className: "items-start pt-6 pb-8", slideClass: (i) => (i % 2 ? "translate-y-6" : "") },
+    { railRef, className: "items-start pt-6 pb-8", slideClass: (i) => (i % 2 ? "translate-y-6" : "") },
   );
 
 const FAN = ["-rotate-3", "-rotate-2", "rotate-0", "rotate-2", "rotate-3"];
 const DEPTH = ["scale-100", "scale-[0.94]", "scale-[0.88]", "scale-[0.82]", "scale-[0.76]"];
 
-const fanned = (spaces: Space[]) =>
+const fanned = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -183,10 +257,10 @@ const fanned = (spaces: Space[]) =>
         <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
       </Link>
     ),
-    { className: "items-end pt-8", slideClass: (i) => (i > 0 ? "-ml-12" : "") },
+    { railRef, className: "items-end pt-8", slideClass: (i) => (i > 0 ? "-ml-12" : "") },
   );
 
-const receding = (spaces: Space[]) =>
+const receding = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -202,10 +276,10 @@ const receding = (spaces: Space[]) =>
         <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
       </Link>
     ),
-    { className: "items-center", slideClass: (i) => (i > 0 ? "-ml-16" : "") },
+    { railRef, className: "items-center", slideClass: (i) => (i > 0 ? "-ml-16" : "") },
   );
 
-const spread = (spaces: Space[]) =>
+const spread = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
@@ -217,10 +291,10 @@ const spread = (spaces: Space[]) =>
         <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
       </Link>
     ),
-    { slideClass: (i) => (i > 0 ? "-ml-20 hover:ml-0 hover:z-20" : "") },
+    { railRef, slideClass: (i) => (i > 0 ? "-ml-20 hover:ml-0 hover:z-20" : "") },
   );
 
-const VARIANTS: { name: string; view: (spaces: Space[]) => ReactNode }[] = [
+const VARIANTS: { name: string; view: (spaces: Space[], railRef: RailRef) => ReactNode }[] = [
   { name: "Deck", view: deck },
   { name: "Tight overlap", view: tight },
   { name: "Landscape deck", view: wide },
@@ -280,13 +354,34 @@ function sample(spaces: Space[], count: number): Space[] {
 export function SpaceList({ spaces }: { spaces: Space[] }) {
   const [active, setActive] = useState(0);
   const [count, setCount] = useState(spaces.length);
+  const railRef = useRef<HTMLUListElement>(null);
   const shown = useMemo(() => sample(spaces, count), [spaces, count]);
+  const edges = useRailEdges(railRef);
+
+  /** One screenful, minus a sliver so the next card stays visible. */
+  const nudge = useCallback((direction: 1 | -1) => {
+    const rail = railRef.current;
+    if (!rail) return;
+
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    rail.scrollBy({
+      left: direction * rail.clientWidth * 0.85,
+      behavior: reduced ? "auto" : "smooth",
+    });
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, [contenteditable=true]")) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        nudge(event.key === "ArrowLeft" ? -1 : 1);
+        return;
+      }
+
       if (event.key.length !== 1) return;
 
       const digit = Number(event.key);
@@ -298,11 +393,22 @@ export function SpaceList({ spaces }: { spaces: Space[] }) {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [nudge]);
 
   return (
     <>
-      {VARIANTS[active].view(shown)}
+      {shown.length > 0 && (
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
+            ‹
+          </NavButton>
+          <NavButton label="Next spaces" disabled={!edges.next} onClick={() => nudge(1)}>
+            ›
+          </NavButton>
+        </div>
+      )}
+
+      {VARIANTS[active].view(shown, railRef)}
 
       <div className="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-2">
         <label className="flex items-center gap-2 rounded-full border border-line bg-card/90 px-3 py-1.5 text-xs text-smoke shadow-lg backdrop-blur">

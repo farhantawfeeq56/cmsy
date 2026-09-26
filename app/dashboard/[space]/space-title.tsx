@@ -8,7 +8,16 @@ import { renameSpace } from "../actions";
  * has no field, so every space arrives as "Untitled space" and is named here —
  * which is also why the field takes focus while it still holds that default.
  */
-export function SpaceTitle({ id, name }: { id: string; name: string }) {
+export function SpaceTitle({
+  id,
+  name,
+  className = "text-4xl tracking-[-0.02em]",
+}: {
+  id: string;
+  name: string;
+  /** The whole size and tracking set, so a layout can pick its own. */
+  className?: string;
+}) {
   const [value, setValue] = useState(name);
   const saved = useRef(name);
   const untitled = name === "Untitled space";
@@ -45,7 +54,7 @@ export function SpaceTitle({ id, name }: { id: string; name: string }) {
           event.currentTarget.blur();
         }
       }}
-      className="font-primary w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-4xl font-normal tracking-[-0.02em] outline-none hover:border-line focus:border-line focus:bg-card"
+      className={`font-primary w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 font-normal outline-none hover:border-line focus:border-line focus:bg-card ${className}`}
     />
   );
 }

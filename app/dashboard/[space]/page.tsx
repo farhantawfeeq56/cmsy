@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getSpace,
@@ -13,28 +12,16 @@ import {
   renderComponent,
   type Prop,
 } from "@/db/component-template";
-import { ago } from "../ago";
 import {
   createComponent,
-  createPage,
   deleteComponent,
-  deletePage,
   importComponent,
   updateComponent,
   useDesignSystem,
 } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
-import { SpaceTitle } from "./space-title";
-
-/**
- * Two levels, not three equal tabs: Pages are the content this space is for,
- * Design is the visual system behind it.
- */
-const VIEWS = ["pages", "design"] as const;
-type View = (typeof VIEWS)[number];
-
-const LABEL: Record<View, string> = { pages: "Pages", design: "Design" };
+import { SpaceLayout, type View } from "./space-layout";
 
 /**
  * `?tab=` is the old three-tab scheme. Its links still work, but they are
@@ -48,7 +35,7 @@ const legacyTarget = (slug: string, tab: string | string[] | undefined) => {
   return raw ? `/dashboard/${slug}` : null;
 };
 
-/** Shared by the New Page popover and the row menus. */
+/** Shared by the Design view's popovers. */
 const POPOVER =
   "absolute right-0 z-10 rounded-xl border border-line bg-white shadow-[0_6px_12px_#11111114]";
 const SUMMARY = "cursor-pointer list-none [&::-webkit-details-marker]:hidden";
@@ -65,132 +52,21 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
   const space = await getSpace(slug);
   if (!space) notFound();
 
+  // The layout shell is a client component, so the page hands it the data
+  // rather than server-rendered markup it cannot rearrange.
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
-          <SpaceTitle id={space.id} name={space.name} />
-        </h1>
-
-        {/* A 5% ink track with the current section on Surface — paper tones
-            rather than a shadow, and 8px radii like the rest of the UI. */}
-        <nav
-          aria-label="Space sections"
-          className="flex shrink-0 gap-1 rounded-lg bg-[#1111110d] p-1"
-        >
-          {VIEWS.map((item) => (
-            <Link
-              key={item}
-              href={item === "pages" ? `/dashboard/${space.slug}` : `/dashboard/${space.slug}?view=design`}
-              aria-current={view === item ? "page" : undefined}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                view === item ? "bg-card text-ink" : "text-smoke hover:text-ink"
-              }`}
-            >
-              {LABEL[item]}
-            </Link>
-          ))}
-        </nav>
-      </header>
-
-      {view === "pages" ? (
-        <PagesView space={space} />
-      ) : (
-        <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
-      )}
-    </main>
+    <SpaceLayout
+      space={space}
+      pages={view === "pages" ? await listPages(space.id) : []}
+      view={view}
+      design={
+        view === "design" ? (
+          <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
+        ) : null
+      }
+    />
   );
 }
-
-type SpaceSummary = {
-  id: string;
-  slug: string;
-};
-
-async function PagesView({ space }: { space: SpaceSummary }) {
-  const pages = await listPages(space.id);
-
-  return (
-    <section>
-      <div className="flex flex-wrap items-start justify-between gap-3 border-t border-line pt-6">
-        <div>
-          <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Pages</h2>
-          <p className="mt-1 text-sm text-smoke">
-            {pages.length} {pages.length === 1 ? "page" : "pages"}
-          </p>
-        </div>
-
-        {/* Native <details> popover, so the trigger needs no client component. */}
-        <details className="relative">
-          <summary className={`btn ${SUMMARY}`}>
-            <PlusIcon className="size-4" />
-            New Page
-          </summary>
-          {/* w-72 with a small-screen cap so the panel never leaves the viewport. */}
-          <form
-            action={createPage}
-            className={`${POPOVER} mt-2 flex w-72 max-w-[80vw] flex-col gap-3 p-4`}
-          >
-            <input type="hidden" name="spaceId" value={space.id} />
-            <label className="label" htmlFor="new-page-title">
-              Page title
-            </label>
-            <input
-              id="new-page-title"
-              name="title"
-              required
-              maxLength={120}
-              placeholder="e.g. Now"
-              className="input"
-            />
-            <button type="submit" className="btn justify-center">
-              Create page
-            </button>
-          </form>
-        </details>
-      </div>
-
-      {pages.length === 0 ? (
-        <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
-          No pages yet. Add the first one to start writing.
-        </p>
-      ) : (
-        <ul className="mt-5 divide-y divide-line border-t border-line">
-          {pages.map((page) => (
-            <li key={page.id} className="flex items-center gap-3 py-3.5">
-              <Link
-                href={`/dashboard/${space.slug}/pages/${page.slug}`}
-                className="flex min-w-0 flex-1 items-center gap-3 py-1"
-              >
-                <FileIcon className="size-4 shrink-0 text-smoke" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{page.title}</span>
-              </Link>
-              <span className="shrink-0 text-xs text-smoke">
-                Created {ago(page.created_at)}
-              </span>
-              <details className="relative shrink-0">
-                <summary
-                  aria-label={`Actions for ${page.title}`}
-                  className={`flex size-8 items-center justify-center rounded-md text-smoke transition-colors hover:bg-[#1111110d] hover:text-ink ${SUMMARY}`}
-                >
-                  <DotsIcon className="size-4" />
-                </summary>
-                <form action={deletePage} className={`${POPOVER} mt-1 p-1`}>
-                  <input type="hidden" name="id" value={page.id} />
-                  <input type="hidden" name="spaceId" value={space.id} />
-                  <button type="submit" className="btn-quiet flex w-full justify-start rounded-md">
-                    Delete page
-                  </button>
-                </form>
-              </details>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /*
  * A component renders itself: the template it declares, filled with its own
  * fallbacks. Nothing here guesses from the name, which is the whole point — a
@@ -650,41 +526,3 @@ async function DesignView({
     </div>
   );
 }
-
-function icon(className: string | undefined, children: React.ReactNode) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      className={className}
-    >
-      {children}
-    </svg>
-  );
-}
-
-const FileIcon = ({ className }: { className?: string }) =>
-  icon(
-    className,
-    <>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <path d="M14 2v6h6" />
-    </>,
-  );
-
-const PlusIcon = ({ className }: { className?: string }) => icon(className, <path d="M12 5v14M5 12h14" />);
-
-const DotsIcon = ({ className }: { className?: string }) =>
-  icon(
-    className,
-    <>
-      <circle cx="5" cy="12" r="1.25" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
-      <circle cx="19" cy="12" r="1.25" fill="currentColor" stroke="none" />
-    </>,
-  );

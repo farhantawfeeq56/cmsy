@@ -25,8 +25,16 @@ import {
 } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
-import { PlacementBar, SectionNav, type View } from "./section-nav";
 import { SpaceTitle } from "./space-title";
+
+/**
+ * Two levels, not three equal tabs: Pages are the content this space is for,
+ * Design is the visual system behind it.
+ */
+const VIEWS = ["pages", "design"] as const;
+type View = (typeof VIEWS)[number];
+
+const LABEL: Record<View, string> = { pages: "Pages", design: "Design" };
 
 /**
  * `?tab=` is the old three-tab scheme. Its links still work, but they are
@@ -60,31 +68,36 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
-            <SpaceTitle id={space.id} name={space.name} />
-          </h1>
+        <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
+          <SpaceTitle id={space.id} name={space.name} />
+        </h1>
 
-          {/* 2 — on the title's line, straight after the name. */}
-          <SectionNav placement={2} slug={space.slug} view={view} />
-        </div>
-
-        {/* 1 — the title row, pushed right by the header's justify-between. */}
-        <SectionNav placement={1} slug={space.slug} view={view} />
+        {/* A 5% ink track with the current section on Surface — paper tones
+            rather than a shadow, and 8px radii like the rest of the UI. */}
+        <nav
+          aria-label="Space sections"
+          className="flex shrink-0 gap-1 rounded-lg bg-[#1111110d] p-1"
+        >
+          {VIEWS.map((item) => (
+            <Link
+              key={item}
+              href={item === "pages" ? `/dashboard/${space.slug}` : `/dashboard/${space.slug}?view=design`}
+              aria-current={view === item ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                view === item ? "bg-card text-ink" : "text-smoke hover:text-ink"
+              }`}
+            >
+              {LABEL[item]}
+            </Link>
+          ))}
+        </nav>
       </header>
-
-      {/* 3-5 — a row of its own under the title. */}
-      <SectionNav placement={3} className="flex justify-start" slug={space.slug} view={view} />
-      <SectionNav placement={4} className="flex justify-end" slug={space.slug} view={view} />
-      <SectionNav placement={5} className="flex justify-center" slug={space.slug} view={view} />
 
       {view === "pages" ? (
         <PagesView space={space} />
       ) : (
         <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
       )}
-
-      <PlacementBar />
     </main>
   );
 }

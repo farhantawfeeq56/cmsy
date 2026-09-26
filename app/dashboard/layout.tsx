@@ -15,9 +15,9 @@ function AgentStatus({ agent }: { agent: { name: string; lastUsed: string } | nu
     <Link
       href="/dashboard/connect"
       title={`${agent.name} · last used ${agent.lastUsed}`}
-      className="badge shrink-0"
+      className="badge badge-quiet shrink-0"
     >
-      <span aria-hidden className="size-1.5 rounded-full bg-ink" />
+      <span aria-hidden className="size-1.5 rounded-full bg-mint" />
       Agent connected
     </Link>
   ) : (

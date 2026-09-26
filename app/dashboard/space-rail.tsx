@@ -88,21 +88,27 @@ function useRailEdges(railRef: RailRef) {
   return { prev: prev === "true", next: next === "true" };
 }
 
+/** Where the rail's prev/next controls sit. Under review — see `spaces-section.tsx`. */
+export type RailControls =
+  | "above"
+  | "labelled"
+  | "above-centre"
+  | "overlay"
+  | "split"
+  | "below"
+  | "below-centre";
+
 /**
  * The spaces as a fanned deck: cards overlap and sit at an angle, and the rail
- * moves by its own controls rather than a scrollbar.
- *
- * The vertical rhythm is a prop, because the space above the deck is under
- * review: `controlsClass` is the nav row's top margin, `railClass` the track's.
+ * moves by its own controls rather than a scrollbar. The spacing is the tightest
+ * of the four that were compared.
  */
 export function SpaceRail({
   spaces,
-  controlsClass = "mt-4",
-  railClass = "mt-3 pt-8 pb-4",
+  controls = "above",
 }: {
   spaces: Space[];
-  controlsClass?: string;
-  railClass?: string;
+  controls?: RailControls;
 }) {
   const railRef = useRef<HTMLUListElement>(null);
   const edges = useRailEdges(railRef);
@@ -136,49 +142,93 @@ export function SpaceRail({
     return () => window.removeEventListener("keydown", onKey);
   }, [nudge]);
 
+  const previous = (
+    <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
+      ‹
+    </NavButton>
+  );
+  const next = (
+    <NavButton label="Next spaces" disabled={!edges.next} onClick={() => nudge(1)}>
+      ›
+    </NavButton>
+  );
+
+  const track = (
+    <ul
+      ref={railRef}
+      className="-mx-6 mt-2 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 pt-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {spaces.map((space, index) => (
+        <li
+          key={space.id}
+          className={`relative shrink-0 snap-start scroll-ml-4 ${index > 0 ? "-ml-12" : ""}`}
+        >
+          <Link
+            href={`/dashboard/${space.slug}`}
+            className={`font-primary flex h-60 w-52 origin-bottom flex-col justify-between rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
+              TILES[index % TILES.length]
+            } ${FAN[index % FAN.length]}`}
+          >
+            <span aria-hidden className="text-5xl leading-none text-ink/20">
+              {initial(space.name)}
+            </span>
+            <span>
+              <span className="block truncate text-base font-medium tracking-tight">
+                {space.name}
+              </span>
+              <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (spaces.length === 0) return track;
+
+  const pair = (
+    <div className="flex gap-2">
+      {previous}
+      {next}
+    </div>
+  );
+
   return (
     <>
-      {spaces.length > 0 && (
-        <div className={`flex items-center justify-end gap-2 ${controlsClass}`}>
-          <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
-            ‹
-          </NavButton>
-          <NavButton label="Next spaces" disabled={!edges.next} onClick={() => nudge(1)}>
-            ›
-          </NavButton>
+      {controls === "above" && <div className="mt-2 flex justify-end">{pair}</div>}
+
+      {controls === "labelled" && (
+        <div className="mt-2 flex items-center justify-between">
+          <span className="label">Spaces</span>
+          {pair}
         </div>
       )}
 
-      <ul
-        ref={railRef}
-        className={`-mx-6 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${railClass}`}
-      >
-        {spaces.map((space, index) => (
-          <li
-            key={space.id}
-            className={`relative shrink-0 snap-start scroll-ml-4 ${
-              index > 0 ? "-ml-12" : ""
-            }`}
-          >
-            <Link
-              href={`/dashboard/${space.slug}`}
-              className={`font-primary flex h-60 w-52 origin-bottom flex-col justify-between rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
-                TILES[index % TILES.length]
-              } ${FAN[index % FAN.length]}`}
-            >
-              <span aria-hidden className="text-5xl leading-none text-ink/20">
-                {initial(space.name)}
-              </span>
-              <span>
-                <span className="block truncate text-base font-medium tracking-tight">
-                  {space.name}
-                </span>
-                <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {controls === "above-centre" && <div className="mt-2 flex justify-center">{pair}</div>}
+
+      {controls === "overlay" || controls === "split" ? (
+        <div className="relative">
+          {track}
+          {controls === "overlay" ? (
+            <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">{pair}</div>
+          ) : (
+            <>
+              <div className="absolute top-1/2 left-0 z-30 -translate-y-1/2">{previous}</div>
+              <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">{next}</div>
+            </>
+          )}
+        </div>
+      ) : (
+        track
+      )}
+
+      {(controls === "below" || controls === "below-centre") && (
+        <div
+          className={`mt-2 flex ${controls === "below" ? "justify-end" : "justify-center"}`}
+        >
+          {pair}
+        </div>
+      )}
     </>
   );
 }

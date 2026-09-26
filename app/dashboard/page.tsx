@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listRecentActivity, listSpaces, type ActivityItem } from "@/db";
 import { ago } from "./ago";
 import { createSpace } from "./actions";
+import { SpaceList } from "./space-views";
 
 const TILES = ["bg-mint", "bg-butter", "bg-lilac"];
 
@@ -40,33 +41,7 @@ export default async function DashboardPage() {
             No spaces yet. Create one above to start adding pages and components.
           </p>
         ) : (
-          // A fanned deck: cards overlap, hovering fans one out of the row.
-          <ul className="-mx-6 mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pt-4 pb-4">
-            {spaces.map((space, index) => (
-              <li
-                key={space.id}
-                className={`relative shrink-0 snap-start scroll-ml-4 transition-transform hover:z-10 hover:-translate-y-2 ${
-                  index > 0 ? "-ml-14" : ""
-                }`}
-              >
-                <Link
-                  href={`/dashboard/${space.slug}`}
-                  className={`font-primary flex h-60 w-48 flex-col justify-end rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] ${
-                    TILES[index % TILES.length]
-                  }`}
-                >
-                  <span className="block truncate text-base font-medium tracking-tight">
-                    {space.name}
-                  </span>
-                  <span className="mt-1 text-xs text-ink/60">
-                    {space.page_count} {space.page_count === 1 ? "page" : "pages"} ·{" "}
-                    {space.component_count}{" "}
-                    {space.component_count === 1 ? "component" : "components"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <SpaceList spaces={spaces} />
         )}
       </section>
 

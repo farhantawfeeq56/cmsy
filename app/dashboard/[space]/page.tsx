@@ -25,8 +25,25 @@ import {
 } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
-import { SpaceNav, type View } from "./space-nav";
+import {
+  DesignChip,
+  DesignFooter,
+  DesignListRow,
+  DesignSection,
+  DesignStrip,
+  SpotBar,
+  type DesignContext,
+} from "./design-entry";
 import { SpaceTitle } from "./space-title";
+
+/**
+ * Two levels, not three equal tabs: Pages are the content this space is for,
+ * Design is the visual system behind it.
+ */
+const VIEWS = ["pages", "design"] as const;
+type View = (typeof VIEWS)[number];
+
+const LABEL: Record<View, string> = { pages: "Pages", design: "Design" };
 
 /**
  * `?tab=` is the old three-tab scheme. Its links still work, but they are
@@ -57,22 +74,56 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
   const space = await getSpace(slug);
   if (!space) notFound();
 
+  // Shared by the design-system entry point wherever the vartest places it.
+  const context: DesignContext = {
+    name: space.design_system_name ?? "No design system",
+    components: space.component_count,
+  };
+
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-3">
           <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
             <SpaceTitle id={space.id} name={space.name} />
           </h1>
+          <DesignChip slug={space.slug} context={context} />
         </div>
 
-        <SpaceNav slug={space.slug} view={view} />
+        {/* A tinted track with the current section on Surface — paper tones,
+            not a shadow (DESIGN.md), and 8px radii like the other UI. */}
+        <nav
+          aria-label="Space sections"
+          className="flex shrink-0 gap-1 rounded-lg bg-[#1111110d] p-1"
+        >
+          {VIEWS.map((item) => (
+            <Link
+              key={item}
+              href={item === "pages" ? `/dashboard/${space.slug}` : `/dashboard/${space.slug}?view=design`}
+              aria-current={view === item ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                view === item ? "bg-card text-ink" : "text-smoke hover:text-ink"
+              }`}
+            >
+              {LABEL[item]}
+            </Link>
+          ))}
+        </nav>
       </header>
 
+      <DesignStrip slug={space.slug} context={context} />
+
       {view === "pages" ? (
-        <PagesView space={space} />
+        <PagesView space={space} context={context} />
       ) : (
         <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
+      )}
+
+      {view === "pages" && (
+        <>
+          <DesignFooter slug={space.slug} context={context} />
+          <SpotBar />
+        </>
       )}
     </main>
   );
@@ -83,12 +134,12 @@ type SpaceSummary = {
   slug: string;
 };
 
-async function PagesView({ space }: { space: SpaceSummary }) {
+async function PagesView({ space, context }: { space: SpaceSummary; context: DesignContext }) {
   const pages = await listPages(space.id);
 
   return (
     <section>
-      <div className="flex items-start justify-between gap-4 border-t border-line pt-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-t border-line pt-6">
         <div>
           <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Pages</h2>
           <p className="mt-1 text-sm text-smoke">
@@ -96,34 +147,38 @@ async function PagesView({ space }: { space: SpaceSummary }) {
           </p>
         </div>
 
-        {/* Native <details> popover, so the trigger needs no client component. */}
-        <details className="relative">
-          <summary className={`btn ${SUMMARY}`}>
-            <PlusIcon className="size-4" />
-            New Page
-          </summary>
-          {/* w-72 with a small-screen cap so the panel never leaves the viewport. */}
-          <form
-            action={createPage}
-            className={`${POPOVER} mt-2 flex w-72 max-w-[80vw] flex-col gap-3 p-4`}
-          >
-            <input type="hidden" name="spaceId" value={space.id} />
-            <label className="label" htmlFor="new-page-title">
-              Page title
-            </label>
-            <input
-              id="new-page-title"
-              name="title"
-              required
-              maxLength={120}
-              placeholder="e.g. Now"
-              className="input"
-            />
-            <button type="submit" className="btn justify-center">
-              Create page
-            </button>
-          </form>
-        </details>
+        <div className="flex shrink-0 items-center gap-2">
+          <DesignSection slug={space.slug} context={context} />
+
+          {/* Native <details> popover, so the trigger needs no client component. */}
+          <details className="relative">
+            <summary className={`btn ${SUMMARY}`}>
+              <PlusIcon className="size-4" />
+              New Page
+            </summary>
+            {/* w-72 with a small-screen cap so the panel never leaves the viewport. */}
+            <form
+              action={createPage}
+              className={`${POPOVER} mt-2 flex w-72 max-w-[80vw] flex-col gap-3 p-4`}
+            >
+              <input type="hidden" name="spaceId" value={space.id} />
+              <label className="label" htmlFor="new-page-title">
+                Page title
+              </label>
+              <input
+                id="new-page-title"
+                name="title"
+                required
+                maxLength={120}
+                placeholder="e.g. Now"
+                className="input"
+              />
+              <button type="submit" className="btn justify-center">
+                Create page
+              </button>
+            </form>
+          </details>
+        </div>
       </div>
 
       {pages.length === 0 ? (
@@ -132,6 +187,7 @@ async function PagesView({ space }: { space: SpaceSummary }) {
         </p>
       ) : (
         <ul className="mt-5 divide-y divide-line border-t border-line">
+          <DesignListRow slug={space.slug} context={context} />
           {pages.map((page) => (
             <li key={page.id} className="flex items-center gap-3 py-3.5">
               <Link

@@ -111,18 +111,6 @@ body {
   color: var(--color-smoke);
 }
 
-.tab {
-  border-radius: 8px;
-  padding: 0.5rem 0.875rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-smoke);
-}
-
-.tab:hover { color: var(--color-ink); }
-
-.tab[data-active="true"] { background: #1111110d; color: var(--color-ink); }
-
 /* Page editor — a document surface, not a design surface (see DESIGN.md).
    The canvas markup is built as HTML strings, so it is styled here rather
    than with utility classes. */

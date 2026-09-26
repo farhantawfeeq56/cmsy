@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useSyncExternalStore,
-  type ReactNode,
   type RefObject,
 } from "react";
 import type { Space } from "@/db";
@@ -25,26 +24,39 @@ const meta = (space: Space) =>
 
 type RailRef = RefObject<HTMLUListElement | null>;
 
-/** A rail control, parked on the edge of the deck. Dimmed at each end. */
+/** A chevron, drawn rather than typed: the ‹ › glyphs sat off-centre in the circle. */
+const Chevron = ({ side }: { side: "left" | "right" }) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden
+    className="size-4"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.75}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d={side === "left" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
+  </svg>
+);
+
+/** A rail control, parked on the edge of the deck. */
 const NavButton = ({
+  side,
   label,
-  disabled,
   onClick,
-  children,
 }: {
+  side: "left" | "right";
   label: string;
-  disabled: boolean;
   onClick: () => void;
-  children: ReactNode;
 }) => (
   <button
     type="button"
     aria-label={label}
-    disabled={disabled}
     onClick={onClick}
-    className="flex size-9 items-center justify-center rounded-full border border-line bg-card/90 text-lg leading-none text-ink shadow-sm backdrop-blur transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:opacity-30 disabled:hover:border-line"
+    className="flex size-9 items-center justify-center rounded-full border border-line bg-card/90 text-ink shadow-sm backdrop-blur transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
   >
-    <span aria-hidden>{children}</span>
+    <Chevron side={side} />
   </button>
 );
 
@@ -159,16 +171,16 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
         ))}
       </ul>
 
-      <div className="absolute top-1/2 left-0 z-30 -translate-y-1/2">
-        <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
-          ‹
-        </NavButton>
-      </div>
-      <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">
-        <NavButton label="Next spaces" disabled={!edges.next} onClick={() => nudge(1)}>
-          ›
-        </NavButton>
-      </div>
+      {edges.prev && (
+        <div className="absolute top-1/2 left-0 z-30 -translate-y-1/2">
+          <NavButton side="left" label="Previous spaces" onClick={() => nudge(-1)} />
+        </div>
+      )}
+      {edges.next && (
+        <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">
+          <NavButton side="right" label="Next spaces" onClick={() => nudge(1)} />
+        </div>
+      )}
     </div>
   );
 }

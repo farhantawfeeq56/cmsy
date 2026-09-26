@@ -25,7 +25,7 @@ const meta = (space: Space) =>
 
 type RailRef = RefObject<HTMLUListElement | null>;
 
-/** The rail's prev/next controls. Dimmed at each end so a click never does nothing. */
+/** A rail control, parked on the edge of the deck. Dimmed at each end. */
 const NavButton = ({
   label,
   disabled,
@@ -42,7 +42,7 @@ const NavButton = ({
     aria-label={label}
     disabled={disabled}
     onClick={onClick}
-    className="flex size-9 items-center justify-center rounded-full border border-line bg-card text-lg leading-none text-ink transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:opacity-30 disabled:hover:border-line"
+    className="flex size-9 items-center justify-center rounded-full border border-line bg-card/90 text-lg leading-none text-ink shadow-sm backdrop-blur transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:opacity-30 disabled:hover:border-line"
   >
     <span aria-hidden>{children}</span>
   </button>
@@ -88,28 +88,12 @@ function useRailEdges(railRef: RailRef) {
   return { prev: prev === "true", next: next === "true" };
 }
 
-/** Where the rail's prev/next controls sit. Under review — see `spaces-section.tsx`. */
-export type RailControls =
-  | "above"
-  | "labelled"
-  | "above-centre"
-  | "overlay"
-  | "split"
-  | "below"
-  | "below-centre";
-
 /**
  * The spaces as a fanned deck: cards overlap and sit at an angle, and the rail
- * moves by its own controls rather than a scrollbar. The spacing is the tightest
- * of the four that were compared.
+ * moves by its own controls rather than a scrollbar — one parked on each edge,
+ * so the deck is the only thing on its line.
  */
-export function SpaceRail({
-  spaces,
-  controls = "above",
-}: {
-  spaces: Space[];
-  controls?: RailControls;
-}) {
+export function SpaceRail({ spaces }: { spaces: Space[] }) {
   const railRef = useRef<HTMLUListElement>(null);
   const edges = useRailEdges(railRef);
 
@@ -142,93 +126,49 @@ export function SpaceRail({
     return () => window.removeEventListener("keydown", onKey);
   }, [nudge]);
 
-  const previous = (
-    <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
-      ‹
-    </NavButton>
-  );
-  const next = (
-    <NavButton label="Next spaces" disabled={!edges.next} onClick={() => nudge(1)}>
-      ›
-    </NavButton>
-  );
-
-  const track = (
-    <ul
-      ref={railRef}
-      className="-mx-6 mt-2 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 pt-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {spaces.map((space, index) => (
-        <li
-          key={space.id}
-          className={`relative shrink-0 snap-start scroll-ml-4 ${index > 0 ? "-ml-12" : ""}`}
-        >
-          <Link
-            href={`/dashboard/${space.slug}`}
-            className={`font-primary flex h-60 w-52 origin-bottom flex-col justify-between rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
-              TILES[index % TILES.length]
-            } ${FAN[index % FAN.length]}`}
-          >
-            <span aria-hidden className="text-5xl leading-none text-ink/20">
-              {initial(space.name)}
-            </span>
-            <span>
-              <span className="block truncate text-base font-medium tracking-tight">
-                {space.name}
-              </span>
-              <span className="mt-1 block text-xs text-ink/60">{meta(space)}</span>
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-
-  if (spaces.length === 0) return track;
-
-  const pair = (
-    <div className="flex gap-2">
-      {previous}
-      {next}
-    </div>
-  );
-
   return (
-    <>
-      {controls === "above" && <div className="mt-2 flex justify-end">{pair}</div>}
+    <div className="relative mt-2">
+      <ul
+        ref={railRef}
+        className="-mx-6 flex snap-x snap-mandatory items-end gap-5 overflow-x-auto px-6 pt-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {spaces.map((space, index) => (
+          <li
+            key={space.id}
+            className={`relative shrink-0 snap-start scroll-ml-4 ${index > 0 ? "-ml-6" : ""}`}
+          >
+            <Link
+              href={`/dashboard/${space.slug}`}
+              className={`font-primary flex h-64 w-56 origin-bottom flex-col justify-between rounded-xl p-5 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
+                TILES[index % TILES.length]
+              } ${FAN[index % FAN.length]}`}
+            >
+              <span aria-hidden className="text-5xl leading-none text-ink/20">
+                {initial(space.name)}
+              </span>
+              <span>
+                <span className="block truncate text-base font-medium tracking-tight">
+                  {space.name}
+                </span>
+                <span className="mt-2 block text-xs leading-relaxed text-ink/60">
+                  {meta(space)}
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
 
-      {controls === "labelled" && (
-        <div className="mt-2 flex items-center justify-between">
-          <span className="label">Spaces</span>
-          {pair}
-        </div>
-      )}
-
-      {controls === "above-centre" && <div className="mt-2 flex justify-center">{pair}</div>}
-
-      {controls === "overlay" || controls === "split" ? (
-        <div className="relative">
-          {track}
-          {controls === "overlay" ? (
-            <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">{pair}</div>
-          ) : (
-            <>
-              <div className="absolute top-1/2 left-0 z-30 -translate-y-1/2">{previous}</div>
-              <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">{next}</div>
-            </>
-          )}
-        </div>
-      ) : (
-        track
-      )}
-
-      {(controls === "below" || controls === "below-centre") && (
-        <div
-          className={`mt-2 flex ${controls === "below" ? "justify-end" : "justify-center"}`}
-        >
-          {pair}
-        </div>
-      )}
-    </>
+      <div className="absolute top-1/2 left-0 z-30 -translate-y-1/2">
+        <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
+          ‹
+        </NavButton>
+      </div>
+      <div className="absolute top-1/2 right-0 z-30 -translate-y-1/2">
+        <NavButton label="Next spaces" disabled={!edges.next} onClick={() => nudge(1)}>
+          ›
+        </NavButton>
+      </div>
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { listRecentActivity, listSpaces, type ActivityItem } from "@/db";
 import { ago } from "./ago";
 import { createSpace } from "./actions";
-import { SpacesSection } from "./spaces-section";
+import { SpaceRail } from "./space-rail";
 
 const TILES = ["bg-mint", "bg-butter", "bg-lilac"];
 
@@ -35,7 +35,15 @@ export default async function DashboardPage() {
         </form>
       </header>
 
-      <SpacesSection spaces={spaces} />
+      <section className="mt-2">
+        {spaces.length === 0 ? (
+          <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
+            No spaces yet. Create one above to start adding pages and components.
+          </p>
+        ) : (
+          <SpaceRail spaces={spaces} />
+        )}
+      </section>
 
       <section className="mt-12 border-t border-line pt-8">
         <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Recent Activity</h2>

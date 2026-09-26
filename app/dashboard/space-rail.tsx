@@ -130,16 +130,16 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
     <div className="relative mt-2">
       <ul
         ref={railRef}
-        className="-mx-6 flex snap-x snap-mandatory items-end gap-5 overflow-x-auto px-6 pt-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-6 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 pt-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {spaces.map((space, index) => (
           <li
             key={space.id}
-            className={`relative shrink-0 snap-start scroll-ml-4 ${index > 0 ? "-ml-6" : ""}`}
+            className={`relative shrink-0 snap-start scroll-ml-4 ${index > 0 ? "-ml-8" : ""}`}
           >
             <Link
               href={`/dashboard/${space.slug}`}
-              className={`font-primary flex h-64 w-56 origin-bottom flex-col justify-between rounded-xl p-5 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
+              className={`font-primary flex h-60 w-52 origin-bottom flex-col justify-between rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
                 TILES[index % TILES.length]
               } ${FAN[index % FAN.length]}`}
             >
@@ -150,7 +150,7 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
                 <span className="block truncate text-base font-medium tracking-tight">
                   {space.name}
                 </span>
-                <span className="mt-2 block text-xs leading-relaxed text-ink/60">
+                <span className="mt-1 block text-xs text-ink/60">
                   {meta(space)}
                 </span>
               </span>

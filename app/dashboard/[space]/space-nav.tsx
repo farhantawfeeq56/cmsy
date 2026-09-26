@@ -152,7 +152,9 @@ const neverChanges = () => () => {};
  * the toolbar and the unused variants once a design is chosen.
  */
 export function SpaceNav(props: NavProps) {
-  const [index, setIndex] = useState(0);
+  // 3 — Segmented — is the one we picked; the rest stay switchable until the
+  // toolbar comes out for good.
+  const [index, setIndex] = useState(2);
   const visible = useSyncExternalStore(
     neverChanges,
     () => showsAnnotationToolbar(location.hostname),

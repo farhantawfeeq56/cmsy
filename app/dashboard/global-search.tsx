@@ -43,9 +43,7 @@ const Magnifier = () => (
 );
 
 const Hint = ({ children }: { children: string }) => (
-  <kbd className="rounded border border-line px-1.5 py-0.5 font-sans text-[0.625rem] text-smoke">
-    {children}
-  </kbd>
+  <kbd className="px-1.5 py-0.5 font-sans text-[0.625rem] text-smoke">{children}</kbd>
 );
 
 /**

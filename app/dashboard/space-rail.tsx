@@ -91,8 +91,19 @@ function useRailEdges(railRef: RailRef) {
 /**
  * The spaces as a fanned deck: cards overlap and sit at an angle, and the rail
  * moves by its own controls rather than a scrollbar.
+ *
+ * The vertical rhythm is a prop, because the space above the deck is under
+ * review: `controlsClass` is the nav row's top margin, `railClass` the track's.
  */
-export function SpaceRail({ spaces }: { spaces: Space[] }) {
+export function SpaceRail({
+  spaces,
+  controlsClass = "mt-4",
+  railClass = "mt-3 pt-8 pb-4",
+}: {
+  spaces: Space[];
+  controlsClass?: string;
+  railClass?: string;
+}) {
   const railRef = useRef<HTMLUListElement>(null);
   const edges = useRailEdges(railRef);
 
@@ -128,7 +139,7 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
   return (
     <>
       {spaces.length > 0 && (
-        <div className="mt-4 flex items-center justify-end gap-2">
+        <div className={`flex items-center justify-end gap-2 ${controlsClass}`}>
           <NavButton label="Previous spaces" disabled={!edges.prev} onClick={() => nudge(-1)}>
             ‹
           </NavButton>
@@ -140,7 +151,7 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
 
       <ul
         ref={railRef}
-        className="-mx-6 mt-3 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 pt-8 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`-mx-6 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${railClass}`}
       >
         {spaces.map((space, index) => (
           <li

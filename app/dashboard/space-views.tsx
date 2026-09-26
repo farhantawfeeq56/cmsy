@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Space } from "@/db";
 
 /**
@@ -233,8 +233,54 @@ const VARIANTS: { name: string; view: (spaces: Space[]) => ReactNode }[] = [
   { name: "Spread on hover", view: spread },
 ];
 
+/** Names for the mock rows, so a long list reads like a real account. */
+const MOCK_NAMES = [
+  "Marketing site",
+  "Product docs",
+  "Design system",
+  "Onboarding",
+  "Blog",
+  "Help center",
+  "Mobile app",
+  "Brand kit",
+  "Changelog",
+  "Email templates",
+  "Sales deck",
+  "API reference",
+];
+
+/**
+ * The real spaces, padded with mocks up to `count` so the layout can be judged
+ * at any list length. Mock rows borrow a real slug, so every link still lands.
+ */
+function sample(spaces: Space[], count: number): Space[] {
+  const shown: Space[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const real = spaces[i % spaces.length];
+    if (!real) break;
+
+    shown.push(
+      i < spaces.length
+        ? real
+        : {
+            ...real,
+            id: `mock-${i}`,
+            name: MOCK_NAMES[i % MOCK_NAMES.length],
+            page_count: (i * 3) % 17,
+            component_count: (i * 2) % 9,
+            updated_at: new Date(Date.now() - i * 7 * 60 * 60 * 1000).toISOString(),
+          },
+    );
+  }
+
+  return shown;
+}
+
 export function SpaceList({ spaces }: { spaces: Space[] }) {
   const [active, setActive] = useState(0);
+  const [count, setCount] = useState(spaces.length);
+  const shown = useMemo(() => sample(spaces, count), [spaces, count]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -256,27 +302,42 @@ export function SpaceList({ spaces }: { spaces: Space[] }) {
 
   return (
     <>
-      {VARIANTS[active].view(spaces)}
+      {VARIANTS[active].view(shown)}
 
-      <div className="fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-full border border-line bg-card/90 p-1.5 pl-3 shadow-lg backdrop-blur">
-        <span className="font-primary text-xs text-smoke">
-          {active + 1}. {VARIANTS[active].name}
-        </span>
-        <div className="flex gap-0.5">
-          {VARIANTS.map((variant, i) => (
-            <button
-              key={variant.name}
-              type="button"
-              title={`${i + 1}. ${variant.name}`}
-              aria-pressed={i === active}
-              onClick={() => setActive(i)}
-              className={`flex size-7 items-center justify-center rounded-full text-xs tabular-nums transition-colors ${
-                i === active ? "bg-ink text-white" : "text-smoke hover:bg-ink/[0.06]"
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
+      <div className="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-2">
+        <label className="flex items-center gap-2 rounded-full border border-line bg-card/90 px-3 py-1.5 text-xs text-smoke shadow-lg backdrop-blur">
+          Spaces
+          <input
+            type="range"
+            min={0}
+            max={24}
+            value={count}
+            onChange={(event) => setCount(Number(event.target.value))}
+            className="h-1 w-32 accent-[var(--color-ink)]"
+          />
+          <span className="w-4 text-right font-medium tabular-nums text-ink">{count}</span>
+        </label>
+
+        <div className="flex items-center gap-2 rounded-full border border-line bg-card/90 p-1.5 pl-3 shadow-lg backdrop-blur">
+          <span className="font-primary text-xs text-smoke">
+            {active + 1}. {VARIANTS[active].name}
+          </span>
+          <div className="flex gap-0.5">
+            {VARIANTS.map((variant, i) => (
+              <button
+                key={variant.name}
+                type="button"
+                title={`${i + 1}. ${variant.name}`}
+                aria-pressed={i === active}
+                onClick={() => setActive(i)}
+                className={`flex size-7 items-center justify-center rounded-full text-xs tabular-nums transition-colors ${
+                  i === active ? "bg-ink text-white" : "text-smoke hover:bg-ink/[0.06]"
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </>

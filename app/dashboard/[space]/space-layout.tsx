@@ -75,7 +75,11 @@ function SpaceMenu({
       <div className={`${POPOVER} mt-1 w-60 p-1`}>
         <button
           type="button"
-          onClick={onRename}
+          onClick={(event) => {
+            // The caret is now in the field below the menu, so close it.
+            event.currentTarget.closest("details")?.removeAttribute("open");
+            onRename();
+          }}
           className="btn-quiet flex w-full justify-start rounded-md"
         >
           Rename space

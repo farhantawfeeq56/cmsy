@@ -11,6 +11,12 @@ import type { Space } from "@/db";
  */
 const TILES = ["bg-mint", "bg-butter", "bg-lilac"];
 
+const initial = (value: string) => value.trim().charAt(0).toUpperCase() || "?";
+
+/** Fixed class lists rather than inline styles, so Tailwind can see them. */
+const FAN = ["-rotate-3", "-rotate-2", "rotate-0", "rotate-2", "rotate-3"];
+const DEPTH = ["scale-100", "scale-[0.94]", "scale-[0.88]", "scale-[0.82]", "scale-[0.76]"];
+
 const meta = (space: Space) =>
   `${space.page_count} ${space.page_count === 1 ? "page" : "pages"} · ${space.component_count} ${
     space.component_count === 1 ? "component" : "components"
@@ -180,16 +186,20 @@ const tall = (spaces: Space[], railRef: RailRef) =>
     { railRef, slideClass: (i) => (i > 0 ? "-ml-10" : "") },
   );
 
-const numbered = (spaces: Space[], railRef: RailRef) =>
+const fannedMarks = (spaces: Space[], railRef: RailRef) =>
   track(
     spaces,
     (space, i) => (
       <Link
         href={`/dashboard/${space.slug}`}
-        className={card(space, i, "h-60 w-52 justify-between hover:-translate-y-2 hover:z-10")}
+        className={card(
+          space,
+          i,
+          `h-60 w-52 origin-bottom justify-between hover:z-20 hover:rotate-0 ${FAN[i % FAN.length]}`,
+        )}
       >
-        <span className="text-4xl tracking-[-0.04em] text-ink/25">
-          {String(i + 1).padStart(2, "0")}
+        <span aria-hidden className="font-primary text-5xl leading-none text-ink/20">
+          {initial(space.name)}
         </span>
         <span>
           <span className="block truncate text-base font-medium">{space.name}</span>
@@ -197,7 +207,7 @@ const numbered = (spaces: Space[], railRef: RailRef) =>
         </span>
       </Link>
     ),
-    { railRef, slideClass: (i) => (i > 0 ? "-ml-16" : "") },
+    { railRef, className: "items-end pt-8", slideClass: (i) => (i > 0 ? "-ml-12" : "") },
   );
 
 const spines = (spaces: Space[], railRef: RailRef) =>
@@ -237,9 +247,6 @@ const staggered = (spaces: Space[], railRef: RailRef) =>
     ),
     { railRef, className: "items-start pt-6 pb-8", slideClass: (i) => (i % 2 ? "translate-y-6" : "") },
   );
-
-const FAN = ["-rotate-3", "-rotate-2", "rotate-0", "rotate-2", "rotate-3"];
-const DEPTH = ["scale-100", "scale-[0.94]", "scale-[0.88]", "scale-[0.82]", "scale-[0.76]"];
 
 const fanned = (spaces: Space[], railRef: RailRef) =>
   track(
@@ -299,7 +306,7 @@ const VARIANTS: { name: string; view: (spaces: Space[], railRef: RailRef) => Rea
   { name: "Tight overlap", view: tight },
   { name: "Landscape deck", view: wide },
   { name: "Tall spines", view: tall },
-  { name: "Numbered deck", view: numbered },
+  { name: "Fanned marks", view: fannedMarks },
   { name: "Colour spines", view: spines },
   { name: "Staggered", view: staggered },
   { name: "Fanned", view: fanned },

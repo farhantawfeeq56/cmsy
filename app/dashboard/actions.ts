@@ -96,6 +96,20 @@ export async function renamePage(formData: FormData) {
   refresh();
 }
 
+/**
+ * A space is created unnamed — the dashboard's button has no field — so the name
+ * on its own page is the editable one. The slug is deliberately left alone, so a
+ * rename never breaks a link that is already out there.
+ */
+export async function renameSpace(formData: FormData) {
+  const id = uuid(formData.get("id"));
+  const name = text(formData.get("name"), LIMITS.spaceName);
+  if (!id || !name) return;
+
+  await db()`update spaces set name = ${name} where id = ${id}`;
+  refresh();
+}
+
 export async function deletePage(formData: FormData) {
   const id = uuid(formData.get("id"));
   const spaceId = uuid(formData.get("spaceId"));

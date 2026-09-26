@@ -25,6 +25,7 @@ import {
 } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
+import { SpaceTitle } from "./space-title";
 
 /**
  * Two levels, not three equal tabs: Pages are the content this space is for,
@@ -68,7 +69,9 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">{space.name}</h1>
+          <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
+            <SpaceTitle id={space.id} name={space.name} />
+          </h1>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
             Pages are where this space writes and publishes. Components and the design
             system live in Design.

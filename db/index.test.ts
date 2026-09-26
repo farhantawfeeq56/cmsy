@@ -53,6 +53,15 @@ describe("searchEverything", () => {
     expect(await searchEverything(" a ")).toEqual([]);
     expect(calls).toHaveLength(0);
   });
+
+  it("bounds each kind separately, so a common term cannot truncate a whole group", async () => {
+    const { searchEverything } = await load();
+    await searchEverything("docs");
+
+    // Three per-kind limits, and no fourth limit over the union.
+    expect(calls[0].sql.match(/limit/gi)).toHaveLength(3);
+    expect(calls[0].values).toEqual(["%docs%", 4, "%docs%", 4, "%docs%", 4]);
+  });
 });
 
 describe("getSpace", () => {

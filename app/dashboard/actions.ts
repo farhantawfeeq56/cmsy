@@ -49,8 +49,8 @@ const template = (value: FormDataEntryValue | null) =>
   parseTemplate(typeof value === "string" ? value.trim() : "");
 
 export async function createSpace(formData: FormData) {
-  const name = text(formData.get("name"), LIMITS.spaceName);
-  if (!name) return;
+  // The dashboard only submits a button, so an empty name is the normal path.
+  const name = text(formData.get("name"), LIMITS.spaceName) || "Untitled space";
 
   const row = await insertSpace(name);
   if (!row) return;

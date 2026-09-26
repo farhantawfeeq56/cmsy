@@ -41,6 +41,29 @@ describe("db", () => {
   });
 });
 
+describe("searchEverything", () => {
+  it("escapes LIKE wildcards instead of letting a term match every row", async () => {
+    const { searchEverything } = await load();
+    await searchEverything("50%_off");
+    expect(calls[0].values).toContain("%50\\%\\_off%");
+  });
+
+  it("does not query for a term too short to be useful", async () => {
+    const { searchEverything } = await load();
+    expect(await searchEverything(" a ")).toEqual([]);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("bounds each kind separately, so a common term cannot truncate a whole group", async () => {
+    const { searchEverything } = await load();
+    await searchEverything("docs");
+
+    // Three per-kind limits, and no fourth limit over the union.
+    expect(calls[0].sql.match(/limit/gi)).toHaveLength(3);
+    expect(calls[0].values).toEqual(["%docs%", 4, "%docs%", 4, "%docs%", 4]);
+  });
+});
+
 describe("getSpace", () => {
   it("binds the slug as a parameter rather than splicing it into the SQL", async () => {
     const { getSpace } = await load();

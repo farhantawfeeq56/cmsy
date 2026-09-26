@@ -49,8 +49,8 @@ const template = (value: FormDataEntryValue | null) =>
   parseTemplate(typeof value === "string" ? value.trim() : "");
 
 export async function createSpace(formData: FormData) {
-  const name = text(formData.get("name"), LIMITS.spaceName);
-  if (!name) return;
+  // The dashboard only submits a button, so an empty name is the normal path.
+  const name = text(formData.get("name"), LIMITS.spaceName) || "Untitled space";
 
   const row = await insertSpace(name);
   if (!row) return;
@@ -93,6 +93,20 @@ export async function renamePage(formData: FormData) {
   if (!id || !title) return;
 
   await db()`update pages set title = ${title} where id = ${id}`;
+  refresh();
+}
+
+/**
+ * A space is created unnamed — the dashboard's button has no field — so the name
+ * on its own page is the editable one. The slug is deliberately left alone, so a
+ * rename never breaks a link that is already out there.
+ */
+export async function renameSpace(formData: FormData) {
+  const id = uuid(formData.get("id"));
+  const name = text(formData.get("name"), LIMITS.spaceName);
+  if (!id || !name) return;
+
+  await db()`update spaces set name = ${name} where id = ${id}`;
   refresh();
 }
 

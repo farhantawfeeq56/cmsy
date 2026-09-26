@@ -37,6 +37,63 @@ export type Space = {
   updated_at: string;
 };
 
+export type SearchHit = {
+  kind: "space" | "page" | "component";
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+};
+
+/**
+ * `%` and `_` are LIKE wildcards, so a term that contains one is escaped rather
+ * than allowed to match every row. Returns null for a term too short to be worth
+ * a query.
+ */
+export function likePattern(term: string): string | null {
+  const trimmed = term.trim().slice(0, 60);
+  if (trimmed.length < 2) return null;
+  return `%${trimmed.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+/**
+ * One query for the sidebar search: spaces by name, pages by title, components
+ * by name. The href is built here so the client never has to know a route.
+ */
+export async function searchEverything(term: string, perKind = 4): Promise<SearchHit[]> {
+  const pattern = likePattern(term);
+  if (!pattern) return [];
+
+  // Each kind is sliced on its own. One shared LIMIT would let a term that is
+  // common in components and pages truncate spaces away entirely, since the
+  // outer ORDER BY reaches them last.
+  return rows<SearchHit>(db()`
+    select * from (
+      (select 'space' as kind, s.id, s.name as title, '' as subtitle,
+              '/dashboard/' || s.slug as href
+       from spaces s
+       where s.name ilike ${pattern}
+       order by s.name
+       limit ${perKind})
+      union all
+      (select 'page', p.id, p.title, s.name,
+              '/dashboard/' || s.slug || '/pages/' || p.slug
+       from pages p join spaces s on s.id = p.space_id
+       where p.title ilike ${pattern}
+       order by p.title
+       limit ${perKind})
+      union all
+      (select 'component', c.id, c.name, s.name,
+              '/dashboard/' || s.slug || '?view=design#components'
+       from components c join spaces s on s.id = c.space_id
+       where c.name ilike ${pattern}
+       order by c.name
+       limit ${perKind})
+    ) hits
+    order by kind, title
+  `);
+}
+
 export type ActivityItem = {
   id: string;
   kind: "page" | "component";

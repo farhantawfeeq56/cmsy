@@ -45,14 +45,15 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   return (
     <div className="flex min-h-dvh flex-1 flex-col bg-paper text-ink lg:flex-row">
       <aside className="shrink-0 border-b border-line px-4 py-4 lg:w-64 lg:border-b-0 lg:border-r lg:py-6">
-        <Link href="/" className="font-primary block px-2 text-lg font-semibold tracking-tight">
+        <Link
+          href="/dashboard"
+          className="font-primary block px-2 text-lg font-semibold tracking-tight"
+        >
           CMSy
         </Link>
         <AgentStatus agent={agent} />
         <nav className="mt-4 flex flex-wrap gap-1 lg:mt-6 lg:flex-col">
-          <Link href="/dashboard" className="tab">
-            Home
-          </Link>
+          {/* No Home tab: the logo is the way back to the dashboard. */}
           {/* Connect agent lives above, under the logo. */}
           {/* Search and Settings are absent on purpose — no routes behind them yet. */}
           {spaces.length > 0 && (

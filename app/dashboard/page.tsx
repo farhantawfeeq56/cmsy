@@ -2,7 +2,7 @@ import Link from "next/link";
 import { listRecentActivity, listSpaces, type ActivityItem } from "@/db";
 import { ago } from "./ago";
 import { createSpace } from "./actions";
-import { SpaceList } from "./space-views";
+import { SpaceRail } from "./space-rail";
 
 const TILES = ["bg-mint", "bg-butter", "bg-lilac"];
 
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
             No spaces yet. Create one above to start adding pages and components.
           </p>
         ) : (
-          <SpaceList spaces={spaces} />
+          <SpaceRail spaces={spaces} />
         )}
       </section>
 

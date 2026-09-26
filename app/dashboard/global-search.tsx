@@ -61,6 +61,7 @@ export function GlobalSearch() {
   const [cursor, setCursor] = useState(0);
   const field = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const query = term.trim();
@@ -118,14 +119,19 @@ export function GlobalSearch() {
     })),
     {
       label: "Settings",
-      rows: SETTINGS.filter((setting) =>
-        setting.title.toLowerCase().includes(query.toLowerCase()),
-      ).map((setting): Row => ({
-        key: `setting-${setting.id}`,
-        title: setting.title,
-        subtitle: setting.subtitle,
-        href: setting.href,
-      })),
+      // The same minimum the query uses: without it every string would match on
+      // an empty or one-letter term, and the panel would never show its hint.
+      rows:
+        query.length < 2
+          ? []
+          : SETTINGS.filter((setting) =>
+              setting.title.toLowerCase().includes(query.toLowerCase()),
+            ).map((setting): Row => ({
+              key: `setting-${setting.id}`,
+              title: setting.title,
+              subtitle: setting.subtitle,
+              href: setting.href,
+            })),
     },
   ].filter((group) => group.rows.length > 0);
 
@@ -171,6 +177,25 @@ export function GlobalSearch() {
     if (event.key === "Escape") close();
   };
 
+  /** A modal has to hold the keyboard too, not just the scroll. */
+  const onDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") return;
+
+    const focusable = dialog.current?.querySelectorAll<HTMLElement>("input, a[href], button");
+    if (!focusable || focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <>
       <div className="min-w-0 flex-1 sm:max-w-sm">
@@ -193,10 +218,12 @@ export function GlobalSearch() {
           onClick={close}
         >
           <div
+            ref={dialog}
             role="dialog"
             aria-modal="true"
             aria-label="Search"
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={onDialogKeyDown}
             className="w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-card shadow-2xl"
           >
             <div className="flex items-center gap-3 border-b border-line px-4 text-smoke">

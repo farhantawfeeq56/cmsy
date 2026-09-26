@@ -173,15 +173,15 @@ export function GlobalSearch() {
 
   return (
     <>
-      <div className="mt-4 px-2">
+      <div className="min-w-0 flex-1 sm:max-w-sm">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-smoke transition-colors hover:border-ink/20 hover:text-ink"
+          className="flex w-full items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-sm text-smoke transition-colors hover:border-ink/20 hover:text-ink"
         >
           <Magnifier />
-          Search
-          <span className="ml-auto">
+          <span className="truncate">Search spaces, pages, components</span>
+          <span className="ml-auto shrink-0">
             <Hint>⌘K</Hint>
           </span>
         </button>

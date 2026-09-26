@@ -110,6 +110,21 @@ export async function renameSpace(formData: FormData) {
   refresh();
 }
 
+/**
+ * Removes a space and everything in it. `pages`, `components` and the space's
+ * own design systems cascade in the schema, so one delete is the whole job —
+ * there is nothing to sweep up here. It lands on the dashboard, because the
+ * page you were on no longer exists.
+ */
+export async function deleteSpace(formData: FormData) {
+  const id = uuid(formData.get("id"));
+  if (!id) return;
+
+  await db()`delete from spaces where id = ${id}`;
+  refresh();
+  redirect("/dashboard");
+}
+
 export async function deletePage(formData: FormData) {
   const id = uuid(formData.get("id"));
   const spaceId = uuid(formData.get("spaceId"));

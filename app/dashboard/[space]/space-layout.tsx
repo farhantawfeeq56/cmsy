@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { showsAnnotationToolbar } from "@/app/annotation-toolbar";
 import type { PageRow, Space } from "@/db";
-import { createPage, deletePage } from "../actions";
+import { createPage, deletePage, deleteSpace } from "../actions";
 import { ago } from "../ago";
 import { SpaceTitle } from "./space-title";
 
@@ -48,7 +48,68 @@ function Nav({ slug, view, vertical }: { slug: string; view: View; vertical?: bo
   );
 }
 
-/** The space name, edited where it is read. */
+/**
+ * The controls a space was missing: rename (the name itself is the field, so
+ * this only puts the caret in it), a way through to its design system, and the
+ * one irreversible act — deleting it, with what it takes named first.
+ */
+function SpaceMenu({
+  space,
+  onRename,
+}: {
+  space: Shell;
+  onRename: () => void;
+}) {
+  const pages = plural(space.page_count, "page");
+  const components = plural(space.component_count, "component");
+
+  return (
+    <details className="relative shrink-0">
+      <summary
+        aria-label="Space actions"
+        className={`flex size-8 items-center justify-center rounded-md text-smoke transition-colors hover:bg-[#1111110d] hover:text-ink ${SUMMARY}`}
+      >
+        <DotsIcon className="size-4" />
+      </summary>
+
+      <div className={`${POPOVER} mt-1 w-60 p-1`}>
+        <button
+          type="button"
+          onClick={onRename}
+          className="btn-quiet flex w-full justify-start rounded-md"
+        >
+          Rename space
+        </button>
+
+        <Link
+          href={`/dashboard/${space.slug}?view=design`}
+          className="btn-quiet flex w-full justify-start rounded-md"
+        >
+          Design system
+        </Link>
+
+        <form action={deleteSpace} className="border-t border-line pt-1">
+          <input type="hidden" name="id" value={space.id} />
+          <button
+            type="submit"
+            onClick={(event) => {
+              const warning = `Delete “${space.name}”? This removes ${pages} and ${components}, and cannot be undone.`;
+              if (!confirm(warning)) event.preventDefault();
+            }}
+            className="btn-quiet flex w-full justify-start rounded-md"
+          >
+            {/* A signal dot rather than orange text: DESIGN.md keeps ember for the
+                dot, and #E8400D on paper is too light for a 13px label. */}
+            <span aria-hidden className="size-1.5 rounded-full bg-ember" />
+            Delete space
+          </button>
+        </form>
+      </div>
+    </details>
+  );
+}
+
+/** The space name, edited where it is read, with the space's controls beside it. */
 function Title({
   space,
   size = "text-4xl tracking-[-0.02em]",
@@ -58,10 +119,22 @@ function Title({
   size?: string;
   className?: string;
 }) {
+  const wrapper = useRef<HTMLDivElement>(null);
+
+  // The name is already an editable field; Rename only has to point at it.
+  const rename = () => {
+    const input = wrapper.current?.querySelector("input");
+    input?.focus();
+    input?.select();
+  };
+
   return (
-    <h1 className={`min-w-0 ${className}`}>
-      <SpaceTitle id={space.id} name={space.name} className={size} />
-    </h1>
+    <div ref={wrapper} className={`flex min-w-0 items-center gap-1 ${className}`}>
+      <h1 className="min-w-0 flex-1">
+        <SpaceTitle id={space.id} name={space.name} className={size} />
+      </h1>
+      <SpaceMenu space={space} onRename={rename} />
+    </div>
   );
 }
 

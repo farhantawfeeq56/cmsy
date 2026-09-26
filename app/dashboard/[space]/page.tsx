@@ -25,16 +25,8 @@ import {
 } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
+import { SpaceNav, type View } from "./space-nav";
 import { SpaceTitle } from "./space-title";
-
-/**
- * Two levels, not three equal tabs: Pages are the content this space is for,
- * Design is the visual system behind it.
- */
-const VIEWS = ["pages", "design"] as const;
-type View = (typeof VIEWS)[number];
-
-const LABEL: Record<View, string> = { pages: "Pages", design: "Design" };
 
 /**
  * `?tab=` is the old three-tab scheme. Its links still work, but they are
@@ -72,52 +64,10 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
           <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
             <SpaceTitle id={space.id} name={space.name} />
           </h1>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
-            Pages are where this space writes and publishes. Components and the design
-            system live in Design.
-          </p>
         </div>
 
-        <nav
-          aria-label="Space sections"
-          className="flex shrink-0 gap-1 rounded-lg border border-line bg-card p-1"
-        >
-          {VIEWS.map((item) => (
-            <Link
-              key={item}
-              href={item === "pages" ? `/dashboard/${space.slug}` : `/dashboard/${space.slug}?view=design`}
-              aria-current={view === item ? "page" : undefined}
-              data-active={view === item}
-              className="tab"
-            >
-              {LABEL[item]}
-            </Link>
-          ))}
-        </nav>
+        <SpaceNav slug={space.slug} view={view} />
       </header>
-
-      {/* The design context stays one click away while writing pages. */}
-      {view === "pages" && (
-        <Link
-          href={`/dashboard/${space.slug}?view=design`}
-          className="group flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-ink/20"
-        >
-          <span aria-hidden className="size-2 shrink-0 rounded-full bg-mint" />
-          <span className="min-w-0 flex-1 truncate text-sm">
-            <span className="font-medium">
-              {space.design_system_name ?? "No design system"}
-            </span>
-            <span className="text-smoke">
-              {" · "}
-              {space.component_count}{" "}
-              {space.component_count === 1 ? "component" : "components"}
-            </span>
-          </span>
-          <span aria-hidden className="shrink-0 text-xs text-smoke group-hover:text-ink">
-            Design →
-          </span>
-        </Link>
-      )}
 
       {view === "pages" ? (
         <PagesView space={space} />
@@ -131,8 +81,6 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
 type SpaceSummary = {
   id: string;
   slug: string;
-  component_count: number;
-  design_system_name: string | null;
 };
 
 async function PagesView({ space }: { space: SpaceSummary }) {

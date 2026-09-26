@@ -92,8 +92,20 @@ function useRailEdges(railRef: RailRef) {
  * The spaces as a fanned deck: cards overlap and sit at an angle, and the rail
  * moves by its own controls rather than a scrollbar — one parked on each edge,
  * so the deck is the only thing on its line.
+ *
+ * `overlapClass` is how far each card slides under the one before it, and
+ * `gapClass` the space between them. Both are props because the looseness is
+ * under review — see `spaces-section.tsx`.
  */
-export function SpaceRail({ spaces }: { spaces: Space[] }) {
+export function SpaceRail({
+  spaces,
+  overlapClass = "-ml-8",
+  gapClass = "gap-4",
+}: {
+  spaces: Space[];
+  overlapClass?: string;
+  gapClass?: string;
+}) {
   const railRef = useRef<HTMLUListElement>(null);
   const edges = useRailEdges(railRef);
 
@@ -130,12 +142,14 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
     <div className="relative mt-2">
       <ul
         ref={railRef}
-        className="-mx-6 flex snap-x snap-mandatory items-end gap-4 overflow-x-auto px-6 pt-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`-mx-6 flex snap-x snap-mandatory items-end overflow-x-auto px-6 pt-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${gapClass}`}
       >
         {spaces.map((space, index) => (
           <li
             key={space.id}
-            className={`relative shrink-0 snap-start scroll-ml-4 ${index > 0 ? "-ml-8" : ""}`}
+            className={`relative shrink-0 snap-start scroll-ml-4 ${
+              index > 0 ? overlapClass : ""
+            }`}
           >
             <Link
               href={`/dashboard/${space.slug}`}

@@ -365,14 +365,14 @@ const Hero = (p: LayoutProps) => (
     <header className="flex flex-col items-start gap-5">
       <p className="label">Space</p>
       <Title space={p.space} size="text-[3.5rem] tracking-[-0.05em]" />
-      <Nav slug={p.space.slug} view={p.view} />
+      <div className="flex flex-wrap items-center gap-3">
+        <Nav slug={p.space.slug} view={p.view} />
+        <Action {...p} />
+      </div>
     </header>
     <section className="flex flex-col gap-2">
       <Line {...p} />
       <Body {...p} />
-      <div className="mt-3">
-        <Action {...p} tone="row" />
-      </div>
     </section>
   </main>
 );
@@ -463,23 +463,34 @@ const Panel = (p: LayoutProps) => (
 const Center = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 px-6 py-14">
     <Title space={p.space} size="text-center text-4xl tracking-[-0.02em]" className="w-full" />
-    <Nav slug={p.space.slug} view={p.view} />
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      <Nav slug={p.space.slug} view={p.view} />
+      <Action {...p} tone="quiet" />
+    </div>
     <Line {...p} />
     <Body {...p} className="w-full" />
-    <Action {...p} tone="quiet" />
   </main>
 );
 
-/** 10 — the content first: what is here comes before what you can do about it. */
-const ListFirst = (p: LayoutProps) => (
+/**
+ * 10 — the content first: no band over the list, and the count waits at the foot.
+ * The action still sits with the nav, because a button below a long list is a
+ * button nobody scrolls to.
+ */
+const CountLast = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
-    <TitleRow {...p} />
-    <section>
-      <Body {...p} />
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
-        <span className="label">{countText(p)}</span>
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <Title space={p.space} className="flex-1" />
+      <div className="flex shrink-0 items-center gap-2">
+        <Nav slug={p.space.slug} view={p.view} />
         <Action {...p} />
       </div>
+    </header>
+    <section>
+      <Body {...p} />
+      <p className="mt-4 border-t border-line pt-4 text-center text-xs text-smoke">
+        {countText(p)}
+      </p>
     </section>
   </main>
 );
@@ -494,7 +505,7 @@ const LAYOUTS = [
   { name: "Dense", view: Dense },
   { name: "Panel", view: Panel },
   { name: "Center", view: Center },
-  { name: "List last", view: ListFirst },
+  { name: "Count last", view: CountLast },
 ];
 
 /* ------------------------------------------------------------- the picker */

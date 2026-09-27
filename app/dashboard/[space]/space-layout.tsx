@@ -270,60 +270,60 @@ const Empty = ({ className = "" }: { className?: string }) => (
   </p>
 );
 
-/** The Pages heading and its count, with the action on the right. */
-const PagesHead = ({
-  space,
-  pages,
-  action = "btn",
-}: {
-  space: Shell;
-  pages: PageRow[];
-  action?: "btn" | "quiet";
-}) => (
-  <div className="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Pages</h2>
-      <p className="mt-1 text-sm text-smoke">{plural(pages.length, "page")}</p>
-    </div>
-    <NewPage space={space} tone={action} />
+/* ---------------------------------------------------------------- layouts */
+
+type LayoutProps = { space: Shell; pages: PageRow[]; view: View; design: ReactNode };
+
+/** The list, or whatever the Design view brought instead. */
+const Body = (
+  p: LayoutProps & { dense?: boolean; flush?: boolean; className?: string },
+) =>
+  p.view === "design" ? (
+    <div className={p.className}>{p.design}</div>
+  ) : p.pages.length ? (
+    <Rows
+      space={p.space}
+      pages={p.pages}
+      dense={p.dense}
+      flush={p.flush}
+      className={p.className}
+    />
+  ) : (
+    <Empty className={p.className} />
+  );
+
+/** What is in this view: pages on one side, components on the other. */
+const countText = (p: LayoutProps) =>
+  p.view === "design"
+    ? plural(p.space.component_count, "component")
+    : plural(p.pages.length, "page");
+
+/** A section heading and its count, the way the Pages and Design bands read. */
+const Band = (p: LayoutProps) => (
+  <div>
+    <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">
+      {p.view === "design" ? "Design" : "Pages"}
+    </h2>
+    <p className="mt-1 text-sm text-smoke">{countText(p)}</p>
   </div>
 );
 
-/* ---------------------------------------------------------------- layouts */
+/** The same thing, said quietly, for the layouts that have no room for a band. */
+const Line = (p: LayoutProps) => <p className="label">{countText(p)}</p>;
 
-type LayoutProps = { space: Shell; pages: PageRow[]; view: View };
+/**
+ * New Page belongs to the pages list, so it renders nothing on the Design view,
+ * where the Components section carries its own create form.
+ */
+const Action = (p: LayoutProps & { tone?: "btn" | "quiet" | "row" }) =>
+  p.view === "design" ? null : <NewPage space={p.space} tone={p.tone} />;
 
 /** The title row and the nav, as most layouts want them. */
-const TitleRow = ({ space, view, size }: LayoutProps & { size?: string }) => (
+const TitleRow = (p: LayoutProps & { size?: string }) => (
   <header className="flex flex-wrap items-end justify-between gap-4">
-    <Title space={space} size={size} />
-    <Nav slug={space.slug} view={view} />
+    <Title space={p.space} size={p.size} />
+    <Nav slug={p.space.slug} view={p.view} />
   </header>
-);
-
-/** Pages are always a list — what changes is the room around it. */
-const List = ({
-  space,
-  pages,
-  dense,
-  flush,
-  className = "",
-}: {
-  space: Shell;
-  pages: PageRow[];
-  dense?: boolean;
-  flush?: boolean;
-  className?: string;
-}) =>
-  pages.length ? (
-    <Rows space={space} pages={pages} dense={dense} flush={flush} className={className} />
-  ) : (
-    <Empty className={className} />
-  );
-
-/** How much is here, said quietly. */
-const Count = ({ pages, className = "" }: { pages: PageRow[]; className?: string }) => (
-  <p className={`label ${className}`}>{plural(pages.length, "page")}</p>
 );
 
 /** 1 — as it is today: title row, a Pages band, then the list. */
@@ -331,8 +331,11 @@ const Today = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
     <TitleRow {...p} />
     <section className="border-t border-line pt-6">
-      <PagesHead space={p.space} pages={p.pages} />
-      <List {...p} className="mt-5" />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Band {...p} />
+        <Action {...p} />
+      </div>
+      <Body {...p} className="mt-5" />
     </section>
   </main>
 );
@@ -343,14 +346,16 @@ const HeaderRow = (p: LayoutProps) => (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0 flex-1">
         <Title space={p.space} />
-        <Count pages={p.pages} className="mt-1" />
+        <div className="mt-1">
+          <Line {...p} />
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Nav slug={p.space.slug} view={p.view} />
-        <NewPage space={p.space} />
+        <Action {...p} />
       </div>
     </header>
-    <List {...p} />
+    <Body {...p} />
   </main>
 );
 
@@ -363,14 +368,16 @@ const Hero = (p: LayoutProps) => (
       <Nav slug={p.space.slug} view={p.view} />
     </header>
     <section className="flex flex-col gap-2">
-      <Count pages={p.pages} />
-      <List {...p} />
-      <NewPage space={p.space} tone="row" className="mt-3" />
+      <Line {...p} />
+      <Body {...p} />
+      <div className="mt-3">
+        <Action {...p} tone="row" />
+      </div>
     </section>
   </main>
 );
 
-/** 4 — the space and its sections in a left column, the pages in the other. */
+/** 4 — the space and its sections in a left column, the content in the other. */
 const Sidebar = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10 md:flex-row md:gap-12">
     <aside className="flex shrink-0 flex-col gap-5 md:w-56">
@@ -378,8 +385,11 @@ const Sidebar = (p: LayoutProps) => (
       <Nav slug={p.space.slug} view={p.view} vertical />
     </aside>
     <section className="min-w-0 flex-1">
-      <PagesHead space={p.space} pages={p.pages} />
-      <List {...p} className="mt-5" />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Band {...p} />
+        <Action {...p} />
+      </div>
+      <Body {...p} className="mt-5" />
     </section>
   </main>
 );
@@ -389,11 +399,11 @@ const Floating = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10 pb-28">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <Title space={p.space} className="flex-1" />
-      <NewPage space={p.space} />
+      <Action {...p} />
     </header>
     <section className="flex flex-col gap-3 border-t border-line pt-6">
-      <Count pages={p.pages} />
-      <List {...p} />
+      <Line {...p} />
+      <Body {...p} />
     </section>
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-paper/95 p-1 backdrop-blur">
       <Nav slug={p.space.slug} view={p.view} />
@@ -401,7 +411,7 @@ const Floating = (p: LayoutProps) => (
   </main>
 );
 
-/** 6 — the title row sticks to the top while a long list scrolls under it. */
+/** 6 — the title row sticks to the top while long content scrolls under it. */
 const Sticky = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col px-6">
     <div className="sticky top-0 z-30 flex flex-wrap items-end justify-between gap-4 border-b border-line bg-paper/95 py-5 backdrop-blur">
@@ -409,8 +419,11 @@ const Sticky = (p: LayoutProps) => (
       <Nav slug={p.space.slug} view={p.view} />
     </div>
     <section className="flex flex-col gap-5 py-8">
-      <PagesHead space={p.space} pages={p.pages} />
-      <List {...p} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Band {...p} />
+        <Action {...p} />
+      </div>
+      <Body {...p} />
     </section>
   </main>
 );
@@ -424,30 +437,24 @@ const Dense = (p: LayoutProps) => (
     </header>
     <section>
       <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
-        <h2 className="label">Pages · {p.pages.length}</h2>
-        <NewPage space={p.space} tone="quiet" />
+        <h2 className="label">{p.view === "design" ? "Design" : "Pages"} · {countText(p)}</h2>
+        <Action {...p} tone="quiet" />
       </div>
-      <List {...p} dense />
+      <Body {...p} dense />
     </section>
   </main>
 );
 
-/** 8 — the list in a panel, so the page has one object instead of three bands. */
+/** 8 — the content in a panel, so the page is one object instead of three bands. */
 const Panel = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-10">
     <TitleRow {...p} />
     <div className="overflow-hidden rounded-xl border border-line">
       <div className="flex items-center justify-between gap-3 border-b border-line bg-card px-4 py-2">
-        <span className="label">{plural(p.pages.length, "page")}</span>
-        <NewPage space={p.space} tone="quiet" />
+        <span className="label">{countText(p)}</span>
+        <Action {...p} tone="quiet" />
       </div>
-      {p.pages.length ? (
-        <Rows space={p.space} pages={p.pages} flush className="px-4" />
-      ) : (
-        <p className="px-4 py-10 text-center text-sm text-smoke">
-          No pages yet. Add the first one to start writing.
-        </p>
-      )}
+      <Body {...p} flush className="px-4" />
     </div>
   </main>
 );
@@ -457,21 +464,21 @@ const Center = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 px-6 py-14">
     <Title space={p.space} size="text-center text-4xl tracking-[-0.02em]" className="w-full" />
     <Nav slug={p.space.slug} view={p.view} />
-    <Count pages={p.pages} />
-    <List {...p} className="w-full" />
-    <NewPage space={p.space} tone="quiet" />
+    <Line {...p} />
+    <Body {...p} className="w-full" />
+    <Action {...p} tone="quiet" />
   </main>
 );
 
-/** 10 — the list first: what is here comes before what you can do about it. */
+/** 10 — the content first: what is here comes before what you can do about it. */
 const ListFirst = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
     <TitleRow {...p} />
     <section>
-      <List {...p} />
+      <Body {...p} />
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
-        <span className="label">{plural(p.pages.length, "page")}</span>
-        <NewPage space={p.space} />
+        <span className="label">{countText(p)}</span>
+        <Action {...p} />
       </div>
     </section>
   </main>
@@ -539,14 +546,7 @@ export function SpaceLayout({
 
   return (
     <>
-      {view === "design" ? (
-        <main className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-6 py-10">
-          <TitleRow space={space} pages={pages} view={view} />
-          {design}
-        </main>
-      ) : (
-        <Layout space={space} pages={pages} view={view} />
-      )}
+      <Layout space={space} pages={pages} view={view} design={design} />
       <LayoutBar />
     </>
   );

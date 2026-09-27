@@ -228,15 +228,18 @@ function Rows({
   space,
   pages,
   dense,
+  flush,
   className = "",
 }: {
   space: Shell;
   pages: PageRow[];
   dense?: boolean;
+  /** Inside a panel the row above already draws the line. */
+  flush?: boolean;
   className?: string;
 }) {
   return (
-    <ul className={`divide-y divide-line border-t border-line ${className}`}>
+    <ul className={`divide-y divide-line ${flush ? "" : "border-t border-line"} ${className}`}>
       {pages.map((page) => (
         <li
           key={page.id}
@@ -256,74 +259,6 @@ function Rows({
         </li>
       ))}
     </ul>
-  );
-}
-
-function Cards({
-  space,
-  pages,
-  className = "",
-}: {
-  space: Shell;
-  pages: PageRow[];
-  className?: string;
-}) {
-  return (
-    <ul className={`grid gap-3 sm:grid-cols-2 ${className}`}>
-      {pages.map((page) => (
-        <li
-          key={page.id}
-          className="flex items-start justify-between gap-3 rounded-xl border border-line bg-card p-4 transition-colors hover:border-ink/20"
-        >
-          <Link href={pageHref(space.slug, page)} className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{page.title}</span>
-            <span className="mt-1 block text-xs text-smoke">
-              Created {ago(page.created_at)}
-            </span>
-          </Link>
-          <DeleteMenu spaceId={space.id} page={page} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** Rows in a real table, with a header row and a toolbar strip above it. */
-function Table({ space, pages }: { space: Shell; pages: PageRow[] }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-line">
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-card px-4 py-2">
-        <span className="label">{plural(pages.length, "page")}</span>
-        <NewPage space={space} tone="quiet" />
-      </div>
-      <table className="w-full table-fixed">
-        <thead>
-          <tr className="border-b border-line text-left">
-            <th className="label px-4 py-2 font-medium">Title</th>
-            <th className="label w-32 px-4 py-2 font-medium">Created</th>
-            <th className="w-12" />
-          </tr>
-        </thead>
-        <tbody>
-          {pages.map((page) => (
-            <tr
-              key={page.id}
-              className="border-b border-line transition-colors last:border-0 hover:bg-[#11111108]"
-            >
-              <td className="px-4 py-2">
-                <Link href={pageHref(space.slug, page)} className="block truncate text-sm font-medium">
-                  {page.title}
-                </Link>
-              </td>
-              <td className="px-4 py-2 text-xs text-smoke">{ago(page.created_at)}</td>
-              <td className="px-1 py-1">
-                <DeleteMenu spaceId={space.id} page={page} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
@@ -358,7 +293,7 @@ const PagesHead = ({
 
 type LayoutProps = { space: Shell; pages: PageRow[]; view: View };
 
-/** The title row and the nav, as every layout but one used to get it. */
+/** The title row and the nav, as most layouts want them. */
 const TitleRow = ({ space, view, size }: LayoutProps & { size?: string }) => (
   <header className="flex flex-wrap items-end justify-between gap-4">
     <Title space={space} size={size} />
@@ -366,12 +301,30 @@ const TitleRow = ({ space, view, size }: LayoutProps & { size?: string }) => (
   </header>
 );
 
-const List = ({ space, pages, className = "" }: LayoutProps & { className?: string }) =>
+/** Pages are always a list — what changes is the room around it. */
+const List = ({
+  space,
+  pages,
+  dense,
+  flush,
+  className = "",
+}: {
+  space: Shell;
+  pages: PageRow[];
+  dense?: boolean;
+  flush?: boolean;
+  className?: string;
+}) =>
   pages.length ? (
-    <Rows space={space} pages={pages} className={className} />
+    <Rows space={space} pages={pages} dense={dense} flush={flush} className={className} />
   ) : (
     <Empty className={className} />
   );
+
+/** How much is here, said quietly. */
+const Count = ({ pages, className = "" }: { pages: PageRow[]; className?: string }) => (
+  <p className={`label ${className}`}>{plural(pages.length, "page")}</p>
+);
 
 /** 1 — as it is today: title row, a Pages band, then the list. */
 const Today = (p: LayoutProps) => (
@@ -384,20 +337,24 @@ const Today = (p: LayoutProps) => (
   </main>
 );
 
-/** 2 — one bar: name, count, nav and the action together, no Pages band. */
-const Toolbar = (p: LayoutProps) => (
-  <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-8">
-    <div className="flex flex-wrap items-center gap-3 border-b border-line pb-4">
-      <Title space={p.space} size="text-2xl tracking-[-0.01em]" className="flex-1" />
-      <span className="shrink-0 text-xs text-smoke">{plural(p.pages.length, "page")}</span>
-      <Nav slug={p.space.slug} view={p.view} />
-      <NewPage space={p.space} tone="quiet" />
-    </div>
+/** 2 — the name with its count under it, and everything you can do on the right. */
+const HeaderRow = (p: LayoutProps) => (
+  <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <Title space={p.space} />
+        <Count pages={p.pages} className="mt-1" />
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Nav slug={p.space.slug} view={p.view} />
+        <NewPage space={p.space} />
+      </div>
+    </header>
     <List {...p} />
   </main>
 );
 
-/** 3 — the space is the page: display name, nav under it, no heading above the list. */
+/** 3 — the space is the page: display name, nav under it, no heading over the list. */
 const Hero = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-14">
     <header className="flex flex-col items-start gap-5">
@@ -406,7 +363,7 @@ const Hero = (p: LayoutProps) => (
       <Nav slug={p.space.slug} view={p.view} />
     </header>
     <section className="flex flex-col gap-2">
-      <p className="label">{plural(p.pages.length, "page")}</p>
+      <Count pages={p.pages} />
       <List {...p} />
       <NewPage space={p.space} tone="row" className="mt-3" />
     </section>
@@ -417,7 +374,7 @@ const Hero = (p: LayoutProps) => (
 const Sidebar = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10 md:flex-row md:gap-12">
     <aside className="flex shrink-0 flex-col gap-5 md:w-56">
-      <Title space={p.space} size="text-2xl tracking-[-0.01em]" />
+      <Title space={p.space} />
       <Nav slug={p.space.slug} view={p.view} vertical />
     </aside>
     <section className="min-w-0 flex-1">
@@ -431,11 +388,11 @@ const Sidebar = (p: LayoutProps) => (
 const Floating = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10 pb-28">
     <header className="flex flex-wrap items-end justify-between gap-4">
-      <Title space={p.space} />
+      <Title space={p.space} className="flex-1" />
       <NewPage space={p.space} />
     </header>
     <section className="flex flex-col gap-3 border-t border-line pt-6">
-      <p className="label">{plural(p.pages.length, "page")}</p>
+      <Count pages={p.pages} />
       <List {...p} />
     </section>
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-paper/95 p-1 backdrop-blur">
@@ -444,47 +401,11 @@ const Floating = (p: LayoutProps) => (
   </main>
 );
 
-/** 6 — pages as cards, two to a row. */
-const CardGrid = (p: LayoutProps) => (
-  <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-10">
-    <TitleRow {...p} />
-    <section>
-      <PagesHead space={p.space} pages={p.pages} />
-      {p.pages.length ? (
-        <Cards space={p.space} pages={p.pages} className="mt-5" />
-      ) : (
-        <Empty className="mt-5" />
-      )}
-    </section>
-  </main>
-);
-
-/** 7 — the same page with the air taken out: smaller title, tighter rows. */
-const Dense = (p: LayoutProps) => (
-  <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-8">
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <Title space={p.space} size="text-2xl tracking-[-0.01em]" />
-      <Nav slug={p.space.slug} view={p.view} />
-    </header>
-    <section>
-      <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
-        <h2 className="label">Pages · {p.pages.length}</h2>
-        <NewPage space={p.space} tone="quiet" />
-      </div>
-      {p.pages.length ? (
-        <Rows space={p.space} pages={p.pages} dense />
-      ) : (
-        <Empty className="mt-4" />
-      )}
-    </section>
-  </main>
-);
-
-/** 8 — the title row sticks to the top while a long list scrolls under it. */
+/** 6 — the title row sticks to the top while a long list scrolls under it. */
 const Sticky = (p: LayoutProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col px-6">
     <div className="sticky top-0 z-30 flex flex-wrap items-end justify-between gap-4 border-b border-line bg-paper/95 py-5 backdrop-blur">
-      <Title space={p.space} size="text-2xl tracking-[-0.01em]" />
+      <Title space={p.space} className="flex-1" />
       <Nav slug={p.space.slug} view={p.view} />
     </div>
     <section className="flex flex-col gap-5 py-8">
@@ -494,49 +415,79 @@ const Sticky = (p: LayoutProps) => (
   </main>
 );
 
-/** 9 — a console: the pages in a table with a header row and a toolbar strip. */
-const Console = (p: LayoutProps) => (
-  <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-10">
-    <TitleRow {...p} />
+/** 7 — the same page with the air taken out: tighter rows, no per-row timestamp. */
+const Dense = (p: LayoutProps) => (
+  <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-8">
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <Title space={p.space} className="flex-1" />
+      <Nav slug={p.space.slug} view={p.view} />
+    </header>
     <section>
-      {p.pages.length ? (
-        <Table space={p.space} pages={p.pages} />
-      ) : (
-        <>
-          <PagesHead space={p.space} pages={p.pages} />
-          <Empty className="mt-5" />
-        </>
-      )}
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
+        <h2 className="label">Pages · {p.pages.length}</h2>
+        <NewPage space={p.space} tone="quiet" />
+      </div>
+      <List {...p} dense />
     </section>
   </main>
 );
 
-/** 10 — a narrow centred column, the document arrangement. */
-const Centered = (p: LayoutProps) => (
-  <main className="mx-auto flex w-full max-w-xl flex-col items-center gap-6 px-6 py-14">
-    <Title
-      space={p.space}
-      size="text-center text-4xl tracking-[-0.02em]"
-      className="w-full"
-    />
+/** 8 — the list in a panel, so the page has one object instead of three bands. */
+const Panel = (p: LayoutProps) => (
+  <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-10">
+    <TitleRow {...p} />
+    <div className="overflow-hidden rounded-xl border border-line">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-card px-4 py-2">
+        <span className="label">{plural(p.pages.length, "page")}</span>
+        <NewPage space={p.space} tone="quiet" />
+      </div>
+      {p.pages.length ? (
+        <Rows space={p.space} pages={p.pages} flush className="px-4" />
+      ) : (
+        <p className="px-4 py-10 text-center text-sm text-smoke">
+          No pages yet. Add the first one to start writing.
+        </p>
+      )}
+    </div>
+  </main>
+);
+
+/** 9 — a narrow centred column, the document arrangement. */
+const Center = (p: LayoutProps) => (
+  <main className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 px-6 py-14">
+    <Title space={p.space} size="text-center text-4xl tracking-[-0.02em]" className="w-full" />
     <Nav slug={p.space.slug} view={p.view} />
-    <p className="label">{plural(p.pages.length, "page")}</p>
+    <Count pages={p.pages} />
     <List {...p} className="w-full" />
     <NewPage space={p.space} tone="quiet" />
   </main>
 );
 
+/** 10 — the list first: what is here comes before what you can do about it. */
+const ListFirst = (p: LayoutProps) => (
+  <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
+    <TitleRow {...p} />
+    <section>
+      <List {...p} />
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+        <span className="label">{plural(p.pages.length, "page")}</span>
+        <NewPage space={p.space} />
+      </div>
+    </section>
+  </main>
+);
+
 const LAYOUTS = [
   { name: "Today", view: Today },
-  { name: "Toolbar", view: Toolbar },
+  { name: "Header row", view: HeaderRow },
   { name: "Hero", view: Hero },
   { name: "Sidebar", view: Sidebar },
   { name: "Floating", view: Floating },
-  { name: "Cards", view: CardGrid },
-  { name: "Dense", view: Dense },
   { name: "Sticky", view: Sticky },
-  { name: "Table", view: Console },
-  { name: "Centered", view: Centered },
+  { name: "Dense", view: Dense },
+  { name: "Panel", view: Panel },
+  { name: "Center", view: Center },
+  { name: "List last", view: ListFirst },
 ];
 
 /* ------------------------------------------------------------- the picker */

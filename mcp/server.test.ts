@@ -31,7 +31,7 @@ const { LIMITS } = db;
 const { createCmsyMcpServer } = await import("./server");
 const handler = createMcpHandler(createCmsyMcpServer);
 
-const DOCS = { id: "s-docs", name: "Docs", slug: "docs", page_count: 2, component_count: 2, design_system_id: null, design_system_name: null };
+const DOCS = { id: "s-docs", name: "Docs", slug: "docs", page_count: 2, component_count: 2, design_system_id: null, design_system_name: null, design_system_borrowers: 0 };
 const SITE = { ...DOCS, id: "s-site", name: "Marketing site", slug: "marketing-site" };
 
 type Result = { isError?: boolean; content: { text: string }[]; structuredContent?: Record<string, unknown> };

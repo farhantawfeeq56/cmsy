@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { type ReactNode } from "react";
-import type { PageRow, Space } from "@/db";
+import type { PageRow, SpaceDetail } from "@/db";
 import { createPage, deletePage, deleteSpace } from "../actions";
 import { ago } from "../ago";
 import { SpaceTitle } from "./space-title";
 
 /** Everything `getSpace` returns for one space. */
-type Shell = Omit<Space, "updated_at">;
+type Shell = SpaceDetail;
 
 /**
  * Two levels, not three equal tabs: Pages are the content this space is for,
@@ -35,9 +35,22 @@ const focusName = () => {
   input?.select();
 };
 
-/** The name being removed is named in the question, with what goes with it. */
-const confirmDelete = (space: Shell) => (event: React.MouseEvent) => {
-  const warning = `Delete “${space.name}”? This removes ${plural(space.page_count, "page")} and ${plural(space.component_count, "component")}, and cannot be undone.`;
+/**
+ * The name being removed is named in the question, with what goes with it —
+ * including any other space left pointing at a design system this space owns,
+ * which the cascade would silently strip them of.
+ */
+const confirmDelete = (space: SpaceDetail) => (event: React.MouseEvent) => {
+  const borrowed = space.design_system_borrowers;
+  const warning = [
+    `Delete “${space.name}”?`,
+    `This removes ${plural(space.page_count, "page")} and ${plural(space.component_count, "component")}.`,
+    borrowed > 0 &&
+      `${plural(borrowed, "other space")} uses this space's design system and will be left without one.`,
+    "This cannot be undone.",
+  ]
+    .filter(Boolean)
+    .join(" ");
   if (!confirm(warning)) event.preventDefault();
 };
 
@@ -49,23 +62,13 @@ const sectionHref = (slug: string, view: View) =>
  * a page that keeps only this link can still get back: the space view is the
  * default, but arriving on the design view must not be a dead end.
  */
-const SwitchLink = ({
-  slug,
-  view,
-  vertical,
-}: {
-  slug: string;
-  view: View;
-  vertical?: boolean;
-}) => {
+const SwitchLink = ({ slug, view }: { slug: string; view: View }) => {
   const to = view === "pages" ? "design" : "pages";
 
   return (
     <Link
       href={sectionHref(slug, to)}
-      className={`btn-quiet flex shrink-0 items-center gap-1.5 rounded-lg border border-line ${
-        vertical ? "justify-center" : ""
-      }`}
+      className="btn-quiet flex shrink-0 items-center gap-1.5 rounded-lg border border-line"
     >
       {LABEL[to]}
       <span aria-hidden>{to === "design" ? "→" : "←"}</span>
@@ -73,21 +76,9 @@ const SwitchLink = ({
   );
 };
 
-/** 2 — the commands themselves, drawn: rename, delete, then the labelled way out. */
-const Commands = ({
-  space,
-  view,
-  vertical,
-}: {
-  space: Shell;
-  view: View;
-  vertical?: boolean;
-}) => (
-  <div
-    className={`flex shrink-0 items-center gap-1 ${
-      vertical ? "flex-col items-stretch" : ""
-    }`}
-  >
+/** The commands themselves, drawn: rename, delete, then the labelled way out. */
+const Commands = ({ space, view }: { space: Shell; view: View }) => (
+  <div className="flex shrink-0 items-center gap-1">
     <button
       type="button"
       onClick={focusName}
@@ -111,26 +102,18 @@ const Commands = ({
       </button>
     </form>
 
-    <span aria-hidden className={`bg-line ${vertical ? "my-1 h-px" : "mx-1 h-5 w-px"}`} />
-    <SwitchLink slug={space.slug} view={view} vertical={vertical} />
+    <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+    <SwitchLink slug={space.slug} view={view} />
   </div>
 );
 
 /**
  * The header's controls: the commands a space has, and the labelled way across
- * to the other half of it. A layout only decides where this cluster sits.
+ * to the other half of it.
  */
-function Cluster({
-  space,
-  view,
-  vertical,
-}: {
-  space: Shell;
-  view: View;
-  vertical?: boolean;
-}) {
-  return <Commands space={space} view={view} vertical={vertical} />;
-}
+const Cluster = ({ space, view }: { space: Shell; view: View }) => (
+  <Commands space={space} view={view} />
+);
 
 /** The space name, edited where it is read, with the action if it belongs here. */
 function Title({

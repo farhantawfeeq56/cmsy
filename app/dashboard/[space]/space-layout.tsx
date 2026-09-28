@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { showsAnnotationToolbar } from "@/app/annotation-toolbar";
+import { type ReactNode } from "react";
 import type { PageRow, Space } from "@/db";
 import { createPage, deletePage, deleteSpace } from "../actions";
 import { ago } from "../ago";
@@ -136,12 +135,10 @@ function Cluster({
 /** The space name, edited where it is read, with the action if it belongs here. */
 function Title({
   space,
-  view,
   size = "text-4xl tracking-[-0.02em]",
   className = "",
 }: {
   space: Shell;
-  view: View;
   size?: string;
   className?: string;
 }) {
@@ -150,7 +147,6 @@ function Title({
       <h1 className="min-w-0 flex-1">
         <SpaceTitle id={space.id} name={space.name} className={size} />
       </h1>
-      <TopAction space={space} view={view} />
     </div>
   );
 }
@@ -178,42 +174,7 @@ const PageForm = ({ space }: { space: Shell }) => (
   </form>
 );
 
-/** Native <details> popover, so a trigger needs no client state. */
-function NewPage({
-  space,
-  tone = "btn",
-  className = "",
-}: {
-  space: Shell;
-  tone?: "btn" | "quiet" | "row";
-  className?: string;
-}) {
-  if (tone === "row")
-    return (
-      <details className={`relative ${className}`}>
-        <summary
-          className={`flex cursor-pointer list-none items-center gap-2 rounded-lg border border-dashed border-line px-3 py-3 text-sm text-smoke transition-colors hover:border-ink/20 hover:text-ink ${SUMMARY}`}
-        >
-          <PlusIcon className="size-4" />
-          New page
-        </summary>
-        <PageForm space={space} />
-      </details>
-    );
-
-  return (
-    <details className={`relative shrink-0 ${className}`}>
-      <summary
-        className={`${tone === "quiet" ? "btn-quiet rounded-lg border border-line" : "btn"} ${SUMMARY}`}
-      >
-        <PlusIcon className="size-4" />
-        New Page
-      </summary>
-      <PageForm space={space} />
-    </details>
-  );
-}
-
+/** Delete, behind a menu so a row is not two buttons wide. */
 function DeleteMenu({ spaceId, page }: { spaceId: string; page: PageRow }) {
   return (
     <details className="relative shrink-0">
@@ -237,88 +198,62 @@ function DeleteMenu({ spaceId, page }: { spaceId: string; page: PageRow }) {
 const pageHref = (slug: string, page: PageRow) => `/dashboard/${slug}/pages/${page.slug}`;
 
 /**
- * Add a page in place. Rendered inside a row's <li>, it stays a valid list item
-/**
- * Add a page in place. The trigger and form are one piece; the wrappers below
- * decide whether it sits in the list or in the empty state.
+ * Add a page in place: the trigger and the form are one piece, so the list owns
+ * no state and the popover is a native one either way. `labelled` is for the
+ * empty state, where an unlabelled + has no list to sit against.
  */
-function AddTrigger({ space, variant }: { space: Shell; variant: 0 | 1 | 2 }) {
+function AddPage({ space, labelled }: { space: Shell; labelled?: boolean }) {
   return (
     <details className="relative">
       <summary
-        className={`cursor-pointer list-none text-sm text-smoke transition-colors hover:text-ink ${SUMMARY} ${
-          variant === 0
-            ? "flex items-center gap-2 border-b border-line py-3"
-            : variant === 1
-              ? "flex size-8 items-center justify-center rounded-md text-ink hover:bg-[#1111110d]"
-              : "my-2 flex items-center justify-center gap-2 rounded-xl border border-dashed border-line py-3 hover:border-ink/25"
-        }`}
+        aria-label="New page"
+        title="New page"
+        className={
+          labelled
+            ? `flex cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-line px-4 py-2.5 text-sm text-smoke transition-colors hover:border-ink/25 hover:text-ink ${SUMMARY}`
+            : `flex size-8 cursor-pointer list-none items-center justify-center rounded-md text-ink transition-colors hover:bg-[#1111110d] ${SUMMARY}`
+        }
       >
         <PlusIcon className="size-4" />
-        {variant === 1 ? null : "New page"}
+        {labelled && "New page"}
       </summary>
       <PageForm space={space} />
     </details>
   );
 }
 
-/**
- * Where the button sits when the list is empty: inside the dashed box, so the
- * one thing you can do is in the one thing you are looking at.
- */
-function AddToEmpty({ space }: { space: Shell }) {
-  return <AddTrigger space={space} variant={2} />;
-}
-
-/** Hairline rows. `dense` drops the icon and the timestamp to fit more per screen. */
+/** Hairline page rows. The + is the first row, above the pages, empty or not. */
 function Rows({
   space,
   pages,
-  dense,
-  flush,
   className = "",
 }: {
   space: Shell;
   pages: PageRow[];
-  dense?: boolean;
-  /** Inside a panel the row above already draws the line. */
-  flush?: boolean;
   className?: string;
 }) {
-  const plus = usePlus();
-
   return (
-    <ul className={`divide-y divide-line ${flush ? "" : "border-t border-line"} ${className}`}>
-      {plus === 2 && (
-        <li>
-          <AddTrigger space={space} variant={0} />
-        </li>
-      )}
-      {plus === 4 && (
-        <li>
-          <AddTrigger space={space} variant={2} />
-        </li>
-      )}
-      {plus === 3 && (
-        <li className="flex justify-end py-1">
-          <AddTrigger space={space} variant={1} />
-        </li>
-      )}
+    <ul className={`divide-y divide-line border-t border-line ${className}`}>
+      {/* Above the first row, never below the list: a button under a long list is
+          a button nobody scrolls to, and on an empty list it is all there is. */}
+      <li className="flex justify-end py-1">
+        <AddPage space={space} />
+      </li>
       {pages.map((page) => (
         <li
           key={page.id}
-          className={`flex items-center gap-3 ${dense ? "py-2" : "py-3.5"}`}
+          className="flex items-center gap-3 py-3.5"
         >
-          {!dense && <FileIcon className="size-4 shrink-0 text-smoke" />}
+          <FileIcon className="size-4 shrink-0 text-smoke" />
           <Link
             href={pageHref(space.slug, page)}
             className="flex min-w-0 flex-1 items-center gap-3 py-1"
           >
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{page.title}</span>
           </Link>
-          {!dense && (
-            <span className="shrink-0 text-xs text-smoke">Created {ago(page.created_at)}</span>
-          )}
+          <span className="shrink-0 text-xs text-smoke">
+            Created {ago(page.created_at)}
+          </span>
           <DeleteMenu spaceId={space.id} page={page} />
         </li>
       ))}
@@ -326,48 +261,29 @@ function Rows({
   );
 }
 
-const Empty = ({
-  space,
-  className = "",
-}: {
-  space: Shell;
-  className?: string;
-}) => {
-  const plus = usePlus();
-  // Only when the chosen placement lives inside the list: the others already put
-  // the action somewhere this box cannot hide.
-  const inList = plus >= 2;
-
-  return (
-    <div
-      className={`flex flex-col items-center gap-2 rounded-xl border border-dashed border-line px-6 py-10 text-center ${className}`}
-    >
-      <p className="text-sm text-smoke">No pages yet. Add the first one to start writing.</p>
-      {inList && <AddToEmpty space={space} />}
-    </div>
-  );
-};
+const Empty = ({ space, className = "" }: { space: Shell; className?: string }) => (
+  <div
+    className={`flex flex-col items-center gap-3 rounded-xl border border-dashed border-line px-6 py-10 text-center ${className}`}
+  >
+    <p className="text-sm text-smoke">No pages yet. Add the first one to start writing.</p>
+    {/* The + row lives in the list, which does not exist yet, so the box carries
+        its own — otherwise an empty space has no way to add anything. */}
+    <AddPage space={space} labelled />
+  </div>
+);
 
 /* ---------------------------------------------------------------- pieces */
 
 type ShellProps = { space: Shell; pages: PageRow[]; view: View; design: ReactNode };
 
 /** The list, or whatever the Design view brought instead. */
-const Body = (
-  p: ShellProps & { dense?: boolean; flush?: boolean; className?: string },
-) =>
+const Body = (p: ShellProps) =>
   p.view === "design" ? (
-    <div className={p.className}>{p.design}</div>
+    <div>{p.design}</div>
   ) : p.pages.length ? (
-    <Rows
-      space={p.space}
-      pages={p.pages}
-      dense={p.dense}
-      flush={p.flush}
-      className={p.className}
-    />
+    <Rows space={p.space} pages={p.pages} />
   ) : (
-    <Empty space={p.space} className={p.className} />
+    <Empty space={p.space} />
   );
 
 /** What is in this view: pages on one side, components on the other. */
@@ -386,66 +302,19 @@ const Band = (p: ShellProps) => (
   </div>
 );
 
-/**
- * New Page belongs to the pages list, so it renders nothing on the Design view,
- * where the Components section carries its own create form — and nothing on the
- * placements that put it somewhere other than this band.
- */
-const Action = (p: ShellProps & { tone?: "btn" | "quiet" | "row" }) => {
-  const plus = usePlus();
-  if (p.view === "design" || plus !== 0) return null;
-  return <NewPage space={p.space} tone={p.tone} />;
-};
-
-/** The placement that puts it above everything, beside the space name. */
-const TopAction = ({ space, view }: { space: Shell; view: View }) => {
-  const plus = usePlus();
-  if (plus !== 1 || view === "design") return null;
-  return <NewPage space={space} />;
-};
-
 /** The settled arrangement: a title row, a band that names what is below it, the body. */
 const ShellPage = (p: ShellProps) => (
   <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
     <header className="flex flex-wrap items-end justify-between gap-4">
-      <Title space={p.space} view={p.view} />
+      <Title space={p.space} />
       <Cluster space={p.space} view={p.view} />
     </header>
-    <section className="border-t border-line pt-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <Band {...p} />
-        <Action {...p} />
-      </div>
-      <Body {...p} className="mt-5" />
+    <section className="flex flex-col gap-5 border-t border-line pt-6">
+      <Band {...p} />
+      <Body {...p} />
     </section>
   </main>
 );
-
-/* ---------------------------------------- vartest: where the New Page lives */
-
-/**
- * Five placements for one button: above the list with the name, the way most
- * pages have it, first inside the list, a + in the list's top right, or a dashed
- * card below the pages — the one the reference screenshot shows.
- */
-const PLUS_NAMES = ["Above", "With name", "First row", "In list", "Add card"];
-
-let plus = 0;
-const plusListeners = new Set<() => void>();
-
-const subscribePlus = (notify: () => void) => {
-  plusListeners.add(notify);
-  return () => {
-    plusListeners.delete(notify);
-  };
-};
-
-const readPlus = () => plus;
-const usePlus = () => useSyncExternalStore(subscribePlus, readPlus, readPlus);
-const pickPlus = (next: number) => {
-  plus = next;
-  plusListeners.forEach((notify) => notify());
-};
 
 export function SpaceLayout({
   space,
@@ -458,56 +327,7 @@ export function SpaceLayout({
   view: View;
   design: ReactNode;
 }) {
-  return (
-    <>
-      <ShellPage space={space} pages={pages} view={view} design={design} />
-      <PlusBar />
-    </>
-  );
-}
-
-/** One placement at a time, on the numbers, the fifth on zero. */
-function PlusBar() {
-  const chosen = usePlus();
-  const visible = useSyncExternalStore(
-    subscribePlus,
-    () => showsAnnotationToolbar(location.hostname),
-    () => false,
-  );
-
-  useEffect(() => {
-    if (!visible) return;
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]"))
-        return;
-      if (event.key === "0") return pickPlus(4);
-      const digit = Number(event.key);
-      if (digit >= 1 && digit <= 4) pickPlus(digit - 1);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [visible]);
-
-  if (!visible) return null;
-
-  return (
-    <div className="fixed right-4 bottom-4 z-50 flex items-center gap-1 rounded-full border border-line bg-white/95 p-1 shadow-[0_6px_20px_#1111111f] backdrop-blur">
-      <span className="label px-2">{PLUS_NAMES[chosen]}</span>
-      {PLUS_NAMES.map((name, i) => (
-        <button
-          key={name}
-          type="button"
-          onClick={() => pickPlus(i)}
-          aria-pressed={chosen === i}
-          data-active={chosen === i || undefined}
-          title={name + " (" + (i === 4 ? 0 : i + 1) + ")"}
-          className="tool"
-        >
-          {i + 1}
-        </button>
-      ))}
-    </div>
-  );
+  return <ShellPage space={space} pages={pages} view={view} design={design} />;
 }
 
 /* ------------------------------------------------------------------ icons */

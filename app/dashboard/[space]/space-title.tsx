@@ -42,6 +42,7 @@ export function SpaceTitle({
       value={value}
       maxLength={80}
       aria-label="Space name"
+      data-space-name
       autoFocus={untitled}
       onFocus={(event) => {
         if (untitled) event.currentTarget.select();

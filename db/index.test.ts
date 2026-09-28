@@ -83,6 +83,16 @@ describe("getSpace", () => {
     const { getSpace } = await load();
     expect(await getSpace("docs")).toEqual({ id: "s1", slug: "docs" });
   });
+
+  it("counts the other spaces borrowing this space's design system, so delete can disclose them", async () => {
+    const { getSpace } = await load();
+    await getSpace("docs");
+
+    // Borrowers are spaces other than this one pointing at a system this owns.
+    expect(calls[0].sql).toMatch(/as design_system_borrowers/);
+    expect(calls[0].sql).toMatch(/design_systems d where d\.space_id = s\.id/);
+    expect(calls[0].sql).toMatch(/o\.id <> s\.id/);
+  });
 });
 
 describe("authenticateMcpToken", () => {

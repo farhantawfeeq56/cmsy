@@ -22,6 +22,7 @@ const { createSpace: insertSpace } = await import("@/db");
 const { redirect } = await import("next/navigation");
 const { createSpace } = await import("./actions");
 const { renameSpace } = await import("./actions");
+const { deleteSpace } = await import("./actions");
 
 function form(fields: Record<string, string>) {
   const data = new FormData();
@@ -70,5 +71,28 @@ describe("renameSpace", () => {
     await renameSpace(form({ id: "../other", name: "Renamed" }));
 
     expect(queries).toHaveLength(0);
+  });
+});
+
+describe("deleteSpace", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queries.length = 0;
+  });
+
+  it("deletes one space by id — the children cascade in the schema", async () => {
+    await deleteSpace(form({ id: "483472dd-8c7d-4828-aee7-6131ad393dc3" }));
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain("delete from spaces");
+    expect(queries[0].values).toEqual(["483472dd-8c7d-4828-aee7-6131ad393dc3"]);
+    expect(redirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("deletes nothing without a uuid", async () => {
+    await deleteSpace(form({ id: "not-an-id" }));
+
+    expect(queries).toHaveLength(0);
+    expect(redirect).not.toHaveBeenCalled();
   });
 });

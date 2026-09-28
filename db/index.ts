@@ -157,13 +157,26 @@ export const listRecentActivity = (limit = 5) =>
     limit ${limit}
   `);
 
-export async function getSpace(slug: string): Promise<Omit<Space, "updated_at"> | null> {
-  const found = await rows<Omit<Space, "updated_at">>(db()`
+/**
+ * `design_system_borrowers` is how many *other* spaces point at one of this
+ * space's design systems. Deleting this space cascades those rows away and
+ * leaves the borrowers on `No design system`, so the delete confirm has to be
+ * able to say so rather than spring it on them.
+ */
+export type SpaceDetail = Omit<Space, "updated_at"> & {
+  design_system_borrowers: number;
+};
+
+export async function getSpace(slug: string): Promise<SpaceDetail | null> {
+  const found = await rows<SpaceDetail>(db()`
     select
       s.id, s.name, s.slug,
       (select count(*)::int from pages p where p.space_id = s.id) as page_count,
       (select count(*)::int from components c where c.space_id = s.id) as component_count,
-      s.design_system_id, ds.name as design_system_name
+      s.design_system_id, ds.name as design_system_name,
+      (select count(*)::int from spaces o
+        where o.design_system_id in (select id from design_systems d where d.space_id = s.id)
+          and o.id <> s.id) as design_system_borrowers
     from spaces s
     left join design_systems ds on ds.id = s.design_system_id
     where s.slug = ${slug}

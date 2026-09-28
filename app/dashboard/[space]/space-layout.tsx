@@ -198,31 +198,26 @@ function DeleteMenu({ spaceId, page }: { spaceId: string; page: PageRow }) {
 const pageHref = (slug: string, page: PageRow) => `/dashboard/${slug}/pages/${page.slug}`;
 
 /**
- * Add a page in place: the trigger and the form are one piece, so the list owns
- * no state and the popover is a native one either way. `labelled` is for the
- * empty state, where an unlabelled + has no list to sit against.
+ * A new page is made the same way a page is opened: a row in the list. First,
+ * not last, so a long list never buries it.
  */
-function AddPage({ space, labelled }: { space: Shell; labelled?: boolean }) {
+function AddPageRow({ space }: { space: Shell }) {
   return (
-    <details className="relative">
-      <summary
-        aria-label="New page"
-        title="New page"
-        className={
-          labelled
-            ? `flex cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-line px-4 py-2.5 text-sm text-smoke transition-colors hover:border-ink/25 hover:text-ink ${SUMMARY}`
-            : `flex size-8 cursor-pointer list-none items-center justify-center rounded-md text-ink transition-colors hover:bg-[#1111110d] ${SUMMARY}`
-        }
-      >
-        <PlusIcon className="size-4" />
-        {labelled && "New page"}
-      </summary>
-      <PageForm space={space} />
-    </details>
+    <li>
+      <details className="relative">
+        <summary
+          className={`flex cursor-pointer list-none items-center gap-3 py-3.5 text-sm text-smoke transition-colors hover:text-ink ${SUMMARY}`}
+        >
+          <PlusIcon className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">Add new page</span>
+        </summary>
+        <PageForm space={space} />
+      </details>
+    </li>
   );
 }
 
-/** Hairline page rows. The + is the first row, above the pages, empty or not. */
+/** The pages, a hairline each, with the way to add one at the top. */
 function Rows({
   space,
   pages,
@@ -234,11 +229,7 @@ function Rows({
 }) {
   return (
     <ul className={`divide-y divide-line border-t border-line ${className}`}>
-      {/* Above the first row, never below the list: a button under a long list is
-          a button nobody scrolls to, and on an empty list it is all there is. */}
-      <li className="flex justify-end py-1">
-        <AddPage space={space} />
-      </li>
+      <AddPageRow space={space} />
       {pages.map((page) => (
         <li
           key={page.id}
@@ -261,15 +252,10 @@ function Rows({
   );
 }
 
-const Empty = ({ space, className = "" }: { space: Shell; className?: string }) => (
-  <div
-    className={`flex flex-col items-center gap-3 rounded-xl border border-dashed border-line px-6 py-10 text-center ${className}`}
-  >
-    <p className="text-sm text-smoke">No pages yet. Add the first one to start writing.</p>
-    {/* The + row lives in the list, which does not exist yet, so the box carries
-        its own — otherwise an empty space has no way to add anything. */}
-    <AddPage space={space} labelled />
-  </div>
+const Empty = ({ className = "" }: { className?: string }) => (
+  <p className={`py-10 text-center text-sm text-smoke ${className}`}>
+    No pages yet. Add the first one to start writing.
+  </p>
 );
 
 /* ---------------------------------------------------------------- pieces */
@@ -280,10 +266,12 @@ type ShellProps = { space: Shell; pages: PageRow[]; view: View; design: ReactNod
 const Body = (p: ShellProps) =>
   p.view === "design" ? (
     <div>{p.design}</div>
-  ) : p.pages.length ? (
-    <Rows space={p.space} pages={p.pages} />
   ) : (
-    <Empty space={p.space} />
+    <>
+      {/* Always the list: it carries the add row even when it is empty. */}
+      <Rows space={p.space} pages={p.pages} />
+      {p.pages.length === 0 && <Empty />}
+    </>
   );
 
 /** What is in this view: pages on one side, components on the other. */
@@ -295,7 +283,7 @@ const countText = (p: ShellProps) =>
 /** A section heading and its count, the way the Pages and Design bands read. */
 const Band = (p: ShellProps) => (
   <div>
-    <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">
+    <h2 className="text-2xl tracking-[-0.01em]">
       {p.view === "design" ? "Design" : "Pages"}
     </h2>
     <p className="mt-1 text-sm text-smoke">{countText(p)}</p>

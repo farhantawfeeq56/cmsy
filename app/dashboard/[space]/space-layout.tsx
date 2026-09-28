@@ -228,7 +228,7 @@ function Rows({
   className?: string;
 }) {
   return (
-    <ul className={`divide-y divide-line border-t border-line ${className}`}>
+    <ul className={`divide-y divide-line ${className}`}>
       <AddPageRow space={space} />
       {pages.map((page) => (
         <li
@@ -283,7 +283,7 @@ const countText = (p: ShellProps) =>
 /** A section heading and its count, the way the Pages and Design bands read. */
 const Band = (p: ShellProps) => (
   <div>
-    <h2 className="text-2xl tracking-[-0.01em]">
+    <h2 className="text-2xl font-medium tracking-[-0.01em]">
       {p.view === "design" ? "Design" : "Pages"}
     </h2>
     <p className="mt-1 text-sm text-smoke">{countText(p)}</p>
@@ -297,7 +297,7 @@ const ShellPage = (p: ShellProps) => (
       <Title space={p.space} />
       <Cluster space={p.space} view={p.view} />
     </header>
-    <section className="flex flex-col gap-5 border-t border-line pt-6">
+    <section className="flex flex-col gap-5">
       <Band {...p} />
       <Body {...p} />
     </section>

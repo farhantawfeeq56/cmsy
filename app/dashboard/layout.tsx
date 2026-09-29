@@ -43,7 +43,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       {/* One header for every dashboard page: the logo is the way home, the
           search is a keystroke away, and the agent state never moves. */}
       <header className="border-b border-line">
-        <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-3 px-6 py-3.5">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-6 py-3.5 sm:px-8 lg:px-10">
           <Link
             href="/dashboard"
             className="font-primary shrink-0 text-lg font-semibold tracking-tight"

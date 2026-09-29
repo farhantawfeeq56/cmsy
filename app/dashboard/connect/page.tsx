@@ -21,7 +21,7 @@ export default async function ConnectPage() {
   const tokens = await listMcpTokens();
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-10">
+    <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
       <header>
         <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
           Connect your agent.

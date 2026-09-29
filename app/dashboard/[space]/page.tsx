@@ -1,11 +1,12 @@
 import { notFound, redirect } from "next/navigation";
-import { getSpace, listComponents, listPages } from "@/db";
+import { getSpace, listComponents, listDesignSystems, listPages } from "@/db";
 import {
   componentProblems,
   parseProps,
   renderComponent,
   type Prop,
 } from "@/db/component-template";
+import { useDesignSystem } from "../actions";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
 import { SpaceLayout, type View } from "./space-layout";
@@ -43,7 +44,7 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
       view={view}
       design={
         view === "design" ? (
-          <DesignView spaceId={space.id} />
+          <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
         ) : null
       }
     />
@@ -196,10 +197,18 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
 /* -------------------------------------------------------------- design system */
 
 /**
- * The system is read here, never written. Components and design tokens are
- * created and changed through the MCP server, so this rail has no picker, no
- * form and no save — there is nothing on it to click.
- */function DesignSystemSection() {
+ * The rules every component is built to. Components and tokens are authored
+ * through the MCP server; the choice of system is not, so it is made here.
+ */async function DesignSystemSection({
+  spaceId,
+  designSystemId,
+}: {
+  spaceId: string;
+  designSystemId: string | null;
+}) {
+  const systems = await listDesignSystems();
+  const current = systems.find((system) => system.id === designSystemId);
+
   return (
     <aside className="min-w-0 lg:sticky lg:top-10">
       <div className="card p-5">
@@ -261,6 +270,44 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
             ))}
           </div>
         </details>
+
+        {/* The MCP has no setter for this, so the choice is made here — a plain
+            form rather than the old popover, since it is not the rail's point. */}
+        {systems.length > 0 && (
+          <form action={useDesignSystem} className="mt-5 border-t border-line pt-4">
+            <input type="hidden" name="spaceId" value={spaceId} />
+            <label className="label block" htmlFor="design-system">
+              Which system this space points at
+            </label>
+            <select
+              id="design-system"
+              name="designSystemId"
+              required
+              defaultValue={current?.id ?? ""}
+              className="input mt-2"
+            >
+              {!current && (
+                <option value="" disabled>
+                  Choose a system
+                </option>
+              )}
+              {systems.map((system) => (
+                <option key={system.id} value={system.id}>
+                  {system.name}
+                  {system.space_id === spaceId ? " (this space)" : ""}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="btn-quiet mt-2 rounded-md border border-line">
+              Use selected system
+            </button>
+            {/* TODO(#48): retire this picker once one global system is
+                decided; nothing above reads the selected row. */}
+            <p className="mt-2 text-xs leading-relaxed text-smoke">
+              The colours, type and guidelines above come from DESIGN.md either way.
+            </p>
+          </form>
+        )}
       </div>
     </aside>
   );
@@ -337,7 +384,13 @@ const COLUMNS = "grid gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-10";
  * line instead of the rail floating up beside a heading. Below `lg` the rail
  * drops underneath.
  */
-async function DesignView({ spaceId }: { spaceId: string }) {
+async function DesignView({
+  spaceId,
+  designSystemId,
+}: {
+  spaceId: string;
+  designSystemId: string | null;
+}) {
   const components = await listComponents(spaceId);
 
   return (
@@ -362,7 +415,7 @@ async function DesignView({ spaceId }: { spaceId: string }) {
 
       <div className={`mt-4 items-start ${COLUMNS}`}>
         <ComponentsSection components={components} />
-        <DesignSystemSection />
+        <DesignSystemSection spaceId={spaceId} designSystemId={designSystemId} />
       </div>
     </div>
   );

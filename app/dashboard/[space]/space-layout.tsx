@@ -55,29 +55,11 @@ const confirmDelete = (space: SpaceDetail) => (event: React.MouseEvent) => {
 };
 
 const sectionHref = (slug: string, view: View) =>
-  view === "pages" ? `/dashboard/${slug}` : `/dashboard/${slug}?view=design`;
+  view === "pages" ? `/dashboard/${slug}` : `/dashboard/${slug}?view=design#components`;
 
-/**
- * The one destination worth a label — the section you are not on. It flips, so
- * a page that keeps only this link can still get back: the space view is the
- * default, but arriving on the design view must not be a dead end.
- */
-const SwitchLink = ({ slug, view }: { slug: string; view: View }) => {
-  const to = view === "pages" ? "design" : "pages";
-
-  return (
-    <Link
-      href={sectionHref(slug, to)}
-      className="btn-quiet flex shrink-0 items-center gap-1.5 rounded-lg border border-line"
-    >
-      {LABEL[to]}
-      <span aria-hidden>{to === "design" ? "→" : "←"}</span>
-    </Link>
-  );
-};
-
-/** The commands themselves, drawn: rename, delete, then the labelled way out. */
-const Commands = ({ space, view }: { space: Shell; view: View }) => (
+/** The commands themselves, drawn: rename, then delete. The way across to the
+ *  other half of the space is the tab row below the title. */
+const Commands = ({ space }: { space: Shell }) => (
   <div className="flex shrink-0 items-center gap-1">
     <button
       type="button"
@@ -103,7 +85,6 @@ const Commands = ({ space, view }: { space: Shell; view: View }) => (
     </form>
 
     <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-    <SwitchLink slug={space.slug} view={view} />
   </div>
 );
 
@@ -111,9 +92,7 @@ const Commands = ({ space, view }: { space: Shell; view: View }) => (
  * The header's controls: the commands a space has, and the labelled way across
  * to the other half of it.
  */
-const Cluster = ({ space, view }: { space: Shell; view: View }) => (
-  <Commands space={space} view={view} />
-);
+const Cluster = ({ space }: { space: Shell }) => <Commands space={space} />;
 
 /** The space name, edited where it is read, with the action if it belongs here. */
 function Title({
@@ -257,28 +236,42 @@ const Body = (p: ShellProps) =>
     </>
   );
 
-/** What is in this view: pages on one side, components on the other. */
-const countText = (p: ShellProps) =>
-  p.view === "design"
-    ? plural(p.space.component_count, "component")
-    : plural(p.pages.length, "page");
-
-/** A section heading and its count, the way the Pages and Design bands read. */
+/**
+ * Pages and Design as one switch — the two halves of a space.
+ */
 const Band = (p: ShellProps) => (
-  <div>
-    <h2 className="text-2xl font-medium tracking-[-0.01em]">
-      {p.view === "design" ? "Design" : "Pages"}
-    </h2>
-    <p className="mt-1 text-sm text-smoke">{countText(p)}</p>
-  </div>
+  <nav
+    aria-label="Space view"
+    className="flex items-center gap-1 border-b border-line"
+  >
+    {(Object.keys(LABEL) as View[]).map((view) => {
+      const active = view === p.view;
+
+      return (
+        <Link
+          key={view}
+          href={sectionHref(p.space.slug, view)}
+          aria-current={active ? "page" : undefined}
+          className={`-mb-px border-b-2 px-3 pt-1 pb-2.5 text-sm font-medium transition-colors ${
+            active
+              ? "border-ink text-ink"
+              : "border-transparent text-smoke hover:text-ink"
+          }`}
+        >
+          {LABEL[view]}
+        </Link>
+      );
+    })}
+  </nav>
 );
 
-/** The settled arrangement: a title row, a band that names what is below it, the body. */
+/** The settled arrangement: a title row, a band that names what is below it, the body.
+ *  One container for both views, so Pages and Design share a margin. */
 const ShellPage = (p: ShellProps) => (
-  <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
+  <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <Title space={p.space} />
-      <Cluster space={p.space} view={p.view} />
+      <Cluster space={p.space} />
     </header>
     <section className="flex flex-col gap-5">
       <Band {...p} />

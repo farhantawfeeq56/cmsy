@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   const [spaces, activity] = await Promise.all([listSpaces(), listRecentActivity()]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-10">
+    <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">

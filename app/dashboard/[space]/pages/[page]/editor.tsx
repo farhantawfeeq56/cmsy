@@ -1,45 +1,133 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { propValues, type Prop } from "@/db/component-template";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Puck, type ComponentConfig, type Config, type Data } from "@puckeditor/core";
+import "@puckeditor/core/puck.css";
+import Image from "@tiptap/extension-image";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
+import { Color, TextStyle } from "@tiptap/extension-text-style";
+import { propValues, renderComponent, type Prop } from "@/db/component-template";
+import type { PageDoc } from "@/db/page-doc";
+import { unsafeUrl } from "@/db/page-html";
 import { renamePage, savePageBlocks } from "../../../actions";
-import {
-  AFTER_BLOCK,
-  componentBlock,
-  esc,
-  parseValues,
-  sanitize,
-} from "./doc";
+import { COMPONENT_PREFIX, componentIds, fromEditor, toEditor } from "./blocks";
 
 type ComponentOption = { id: string; name: string; props: Prop[]; template: string };
-type SelectedBlock = {
-  id: string;
-  componentId: string;
-  name: string;
-  values: Record<string, string>;
+type Status = "saved" | "saving" | "dirty" | "refused";
+
+/**
+ * What the rich-text editor understands beyond Puck's own set. Each one is
+ * something the page allowlist already kept — an image, a colour, sub- and
+ * superscript — so a page written before blocks loses none of it on its first
+ * edit. Module-level, because Puck rebuilds its editor when this array changes.
+ */
+const TEXT_EXTENSIONS = [Image, TextStyle, Color, Subscript, Superscript];
+
+/** The built-in blocks. Components are added per space in `buildConfig`. */
+const BLOCKS: Record<string, ComponentConfig> = {
+  Text: {
+    fields: {
+      text: { type: "richtext", contentEditable: true, tiptap: { extensions: TEXT_EXTENSIONS } },
+    },
+    defaultProps: { text: "" },
+    render: ({ text }) => <div className="doc">{text}</div>,
+  },
+  Image: {
+    fields: {
+      src: { type: "text", label: "Image URL" },
+      alt: { type: "text", label: "Description" },
+    },
+    defaultProps: { src: "", alt: "" },
+    render: ({ src, alt }) =>
+      src && !unsafeUrl(src) ? (
+        <div className="doc">
+          {/* eslint-disable-next-line @next/next/no-img-element -- any URL a writer pastes, not a local asset */}
+          <img src={src} alt={alt} />
+        </div>
+      ) : (
+        <p className="text-sm text-smoke">Add an image URL in the block&apos;s fields.</p>
+      ),
+  },
+  Section: {
+    fields: { content: { type: "slot" } },
+    defaultProps: { content: [] },
+    render: ({ content: Content }) => <Content as="section" />,
+  },
+  Columns: {
+    fields: { left: { type: "slot" }, right: { type: "slot" } },
+    defaultProps: { left: [], right: [] },
+    render: ({ left: Left, right: Right }) => (
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Left />
+        <Right />
+      </div>
+    ),
+  },
 };
-type Format = { block: string; bold: boolean; italic: boolean; list: string };
 
-const BLOCK_STYLES = [
-  { value: "p", label: "Paragraph" },
-  { value: "h1", label: "Title" },
-  { value: "h2", label: "Heading" },
-  { value: "h3", label: "Subheading" },
-  { value: "blockquote", label: "Quote" },
-];
+/**
+ * One block type per component in the space, plus one for any component the
+ * page still holds but the space no longer has, so that block can be seen and
+ * removed rather than breaking the whole editor.
+ */
+function buildConfig(components: ComponentOption[], held: string[]): Config {
+  const entries: Record<string, ComponentConfig> = { ...BLOCKS };
 
-const NO_FORMAT: Format = { block: "p", bold: false, italic: false, list: "" };
+  for (const component of components) {
+    entries[`${COMPONENT_PREFIX}${component.id}`] = {
+      label: component.name,
+      fields: {
+        values: {
+          type: "object",
+          label: "Content",
+          objectFields: Object.fromEntries(
+            component.props.map((prop) => [prop.key, { type: "text", label: prop.label }]),
+          ),
+        },
+      },
+      defaultProps: { values: propValues(component.props) },
+      render: ({ values }) => {
+        const html = renderComponent(component.props, component.template, values);
+        return html ? (
+          // Rendered from a template `componentProblems` has passed, with every
+          // value escaped into place — the same markup the old canvas inserted.
+          <div className="doc">
+            <div className="comp-block" dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
+        ) : (
+          <p className="text-sm text-smoke">{component.name} has no template yet. Build it in Design.</p>
+        );
+      },
+    };
+  }
 
-const uid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `b${Math.random().toString(36).slice(2)}`;
+  for (const id of held) {
+    entries[`${COMPONENT_PREFIX}${id}`] ??= {
+      label: "Missing component",
+      render: () => (
+        <p className="text-sm text-smoke">
+          This component is no longer in the space, so it can only be removed.
+        </p>
+      ),
+    };
+  }
 
-const findIsland = (root: HTMLElement, id: string) =>
-  [...root.querySelectorAll<HTMLElement>("[data-block-id]")].find(
-    (node) => node.getAttribute("data-block-id") === id,
-  ) ?? null;
+  return {
+    categories: {
+      blocks: { title: "Blocks", components: Object.keys(BLOCKS) },
+      components: {
+        title: "Components",
+        components: components.map((component) => `${COMPONENT_PREFIX}${component.id}`),
+      },
+    },
+    components: entries,
+    root: {
+      render: ({ children }: { children: ReactNode }) => <div className="doc-page">{children}</div>,
+    },
+  };
+}
 
 export function PageEditor({
   space,
@@ -47,49 +135,66 @@ export function PageEditor({
   components,
 }: {
   space: { slug: string; name: string };
-  page: { id: string; title: string; html: string };
+  page: { id: string; title: string; doc: PageDoc };
   components: ComponentOption[];
 }) {
-  // Frozen: the canvas is the source of truth once it is mounted, so a refresh
-  // of the surrounding server tree must never write over what is being typed.
-  const [initial] = useState(page.html);
-  const [title, setTitle] = useState(page.title);
-  const [status, setStatus] = useState<"saved" | "saving" | "dirty">("saved");
-  const [format, setFormat] = useState<Format>(NO_FORMAT);
-  const [selected, setSelected] = useState<SelectedBlock | null>(null);
+  // Frozen: Puck owns the document once it is mounted, so a refresh of the
+  // surrounding server tree must never write over what is being edited.
+  const [initial] = useState(() => toEditor(page.doc));
+  const [held] = useState(() => componentIds(page.doc));
+  const config = useMemo(() => buildConfig(components, held), [components, held]);
 
-  const root = useRef<HTMLDivElement | null>(null);
-  const savedRange = useRef<Range | null>(null);
+  const [title, setTitle] = useState(page.title);
+  const [status, setStatus] = useState<Status>("saved");
+  const [refusal, setRefusal] = useState("");
+
+  const latest = useRef<Data | null>(null);
+  const lastSaved = useRef(JSON.stringify(fromEditor(initial)));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dirty = useRef(false);
   const savedTitle = useRef(page.title);
-  const menu = useRef<HTMLDetailsElement | null>(null);
 
   /**
    * Autosave. Next dispatches Server Functions from one client in order, so a
    * later save can never be overtaken by an earlier one still in flight.
    */
   const save = useCallback(async () => {
-    const canvas = root.current;
-    if (!canvas) return;
     if (timer.current) clearTimeout(timer.current);
-    dirty.current = false;
+    timer.current = null;
+    if (!latest.current) return;
+    const doc = fromEditor(latest.current);
+    const json = JSON.stringify(doc);
+    // Opening a page is not an edit: Puck reports its first render too, and a
+    // page still in the old format moves forward on its first real change.
+    if (json === lastSaved.current) {
+      setStatus("saved");
+      return;
+    }
     setStatus("saving");
-    await savePageBlocks(page.id, sanitize(canvas.innerHTML));
-    setStatus(dirty.current ? "dirty" : "saved");
+    const result = await savePageBlocks(page.id, doc);
+    if (result.saved) {
+      lastSaved.current = json;
+      setRefusal("");
+    } else {
+      setRefusal(result.problems[0] ?? "the body was refused");
+    }
+    // Anything typed while the save was in flight is still waiting on the timer.
+    setStatus(!result.saved ? "refused" : timer.current ? "dirty" : "saved");
   }, [page.id]);
 
-  const markDirty = useCallback(() => {
-    dirty.current = true;
-    setStatus("dirty");
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void save(), 700);
-  }, [save]);
+  const onChange = useCallback(
+    (data: Data) => {
+      latest.current = data;
+      if (timer.current) clearTimeout(timer.current);
+      setStatus("dirty");
+      timer.current = setTimeout(() => void save(), 700);
+    },
+    [save],
+  );
 
-  // A tab closed inside the debounce window still gets its last keystrokes out.
+  // A tab closed inside the debounce window still gets its last change out.
   useEffect(() => {
     const flush = () => {
-      if (dirty.current) void save();
+      if (timer.current) void save();
     };
     window.addEventListener("pagehide", flush);
     return () => {
@@ -97,173 +202,6 @@ export function PageEditor({
       flush();
     };
   }, [save]);
-
-  /** Puts the caret back where it was, for commands fired from the toolbar. */
-  const focusCanvas = useCallback(() => {
-    const canvas = root.current;
-    const selection = document.getSelection();
-    if (!canvas || !selection) return;
-    canvas.focus();
-    if (selection.anchorNode && canvas.contains(selection.anchorNode)) return;
-
-    const range = savedRange.current;
-    if (range && canvas.contains(range.startContainer)) {
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
-    }
-    const end = document.createRange();
-    end.selectNodeContents(canvas);
-    end.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(end);
-  }, []);
-
-  const refreshFormat = useCallback(() => {
-    const canvas = root.current;
-    const selection = document.getSelection();
-    if (!canvas || !selection?.anchorNode || !canvas.contains(selection.anchorNode)) return;
-    savedRange.current = selection.getRangeAt(0).cloneRange();
-
-    const block = (document.queryCommandValue("formatBlock") || "p").toLowerCase();
-    const next: Format = {
-      block: ["h1", "h2", "h3", "blockquote"].includes(block) ? block : "p",
-      bold: document.queryCommandState("bold"),
-      italic: document.queryCommandState("italic"),
-      list: document.queryCommandState("insertUnorderedList")
-        ? "ul"
-        : document.queryCommandState("insertOrderedList")
-          ? "ol"
-          : "",
-    };
-    setFormat((current) =>
-      current.block === next.block &&
-      current.bold === next.bold &&
-      current.italic === next.italic &&
-      current.list === next.list
-        ? current
-        : next,
-    );
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener("selectionchange", refreshFormat);
-    return () => document.removeEventListener("selectionchange", refreshFormat);
-  }, [refreshFormat]);
-
-  /** The stored document becomes DOM exactly once, here. */
-  const attachCanvas = useCallback(
-    (node: HTMLDivElement | null) => {
-      root.current = node;
-      if (node && !node.dataset.ready) {
-        node.dataset.ready = "1";
-        node.innerHTML = sanitize(initial);
-      }
-    },
-    [initial],
-  );
-
-  // Browsers default to <div> for a new block; <p> is what the stored document
-  // should read as, for anyone opening `pages.blocks` later.
-  useEffect(() => {
-    document.execCommand("defaultParagraphSeparator", false, "p");
-  }, []);
-
-  const run = (command: string, value?: string) => {
-    focusCanvas();
-    document.execCommand(command, false, value);
-    markDirty();
-    refreshFormat();
-  };
-
-  /** Every path into the canvas goes through here, and so through `sanitize`. */
-  const insertHtml = (html: string) => {
-    focusCanvas();
-    document.execCommand("insertHTML", false, sanitize(html));
-    markDirty();
-    refreshFormat();
-  };
-
-  /**
-   * Pastes and drops come from anywhere, so they are never handed to the
-   * browser's own insertion: the markup is rebuilt through the allowlist first.
-   */
-  const insertPasted = (data: DataTransfer) => {
-    const html = data.getData("text/html");
-    const text = data.getData("text/plain");
-    if (!html && !text) return;
-    insertHtml(html || esc(text).replace(/\r?\n/g, "<br>"));
-  };
-
-  const insertComponent = (component: ComponentOption) => {
-    const id = uid();
-    insertHtml(
-      componentBlock(id, component, propValues(component.props)) + AFTER_BLOCK,
-    );
-    menu.current?.removeAttribute("open");
-  };
-
-  /** The component a selected island was inserted from, if it is still here. */
-  const selectedComponent = selected
-    ? (components.find((component) => component.id === selected.componentId) ?? null)
-    : null;
-
-  const clearSelection = () => {
-    root.current
-      ?.querySelectorAll(".comp-block.is-selected")
-      .forEach((node) => node.classList.remove("is-selected"));
-    setSelected(null);
-  };
-
-  const selectIslandAt = (target: EventTarget | null) => {
-    const canvas = root.current;
-    if (!canvas) return;
-
-    const island =
-      target instanceof Element
-        ? target.closest<HTMLElement>("[data-block='component']")
-        : null;
-    if (!island) {
-      clearSelection();
-      return;
-    }
-    canvas
-      .querySelectorAll(".comp-block.is-selected")
-      .forEach((node) => node.classList.remove("is-selected"));
-    island.classList.add("is-selected");
-    setSelected({
-      id: island.getAttribute("data-block-id") ?? "",
-      componentId: island.getAttribute("data-component-id") ?? "",
-      name: island.getAttribute("data-name") ?? "Component",
-      values: parseValues(island.getAttribute("data-values")) ?? {},
-    });
-  };
-
-  /** Redraws one island from its values, leaving the rest of the document alone. */
-  const redrawBlock = (block: SelectedBlock, values: Record<string, string>) => {
-    const canvas = root.current;
-    const island = canvas ? findIsland(canvas, block.id) : null;
-    const component = components.find((option) => option.id === block.componentId);
-    if (!canvas || !island || !component) return;
-    island.outerHTML = sanitize(componentBlock(block.id, component, values));
-    findIsland(canvas, block.id)?.classList.add("is-selected");
-    markDirty();
-  };
-
-  const editField = (key: string, value: string) => {
-    if (!selected) return;
-    const values = { ...selected.values, [key]: value };
-    setSelected({ ...selected, values });
-    redrawBlock(selected, values);
-  };
-
-  const removeBlock = () => {
-    const canvas = root.current;
-    if (!canvas || !selected) return;
-    findIsland(canvas, selected.id)?.remove();
-    clearSelection();
-    markDirty();
-  };
 
   /** Renaming is its own save: it is rare, and it shows up on the space page. */
   const commitTitle = (value: string) => {
@@ -281,234 +219,59 @@ export function PageEditor({
   };
 
   const statusLabel =
-    status === "saving" ? "Saving…" : status === "dirty" ? "Unsaved changes" : "Saved";
+    status === "saving"
+      ? "Saving…"
+      : status === "dirty"
+        ? "Unsaved changes"
+        : status === "refused"
+          ? `Not saved: ${refusal}`
+          : "Saved";
 
   return (
-    <main className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[46rem] flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6">
-          <Link href={`/dashboard/${space.slug}`} className="btn-quiet -ml-2 shrink-0 rounded-md">
-            ← {space.name}
-          </Link>
-
-          <span aria-hidden className="tool-sep" />
-
-          <select
-            className="tool tool-select"
-            aria-label="Text style"
-            value={format.block}
-            onChange={(event) => run("formatBlock", `<${event.target.value}>`)}
-          >
-            {BLOCK_STYLES.map((style) => (
-              <option key={style.value} value={style.value}>
-                {style.label}
-              </option>
-            ))}
-          </select>
-
-          <Tool label="B" title="Bold (Ctrl+B)" active={format.bold} onClick={() => run("bold")} />
-          <Tool
-            label="I"
-            title="Italic (Ctrl+I)"
-            active={format.italic}
-            onClick={() => run("italic")}
-          />
-          <Tool label="U" title="Underline (Ctrl+U)" onClick={() => run("underline")} />
-
-          <span aria-hidden className="tool-sep" />
-
-          <Tool
-            label="• List"
-            title="Bulleted list"
-            active={format.list === "ul"}
-            onClick={() => run("insertUnorderedList")}
-          />
-          <Tool
-            label="1. List"
-            title="Numbered list"
-            active={format.list === "ol"}
-            onClick={() => run("insertOrderedList")}
-          />
-
-          <span aria-hidden className="tool-sep" />
-
-          <Tool
-            label="Link"
-            title="Add a link"
-            onClick={() => {
-              const url = window.prompt("Link URL", "https://");
-              if (url) run("createLink", url);
-            }}
-          />
-          <Tool
-            label="Image"
-            title="Add an image by URL"
-            onClick={() => {
-              const url = window.prompt("Image URL", "https://");
-              if (url) run("insertImage", url);
-            }}
-          />
-
-          <span aria-hidden className="tool-sep" />
-
-          <Tool label="↶" title="Undo (Ctrl+Z)" onClick={() => run("undo")} />
-          <Tool label="↷" title="Redo (Ctrl+Shift+Z)" onClick={() => run("redo")} />
-
-          <span className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-smoke" aria-live="polite">
-              {statusLabel}
-            </span>
-
-            {/* Native <details>, like the rest of the dashboard. */}
-            <details className="relative" ref={menu}>
-              <summary className="btn cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                ＋ Component
-              </summary>
-              <div className="absolute right-0 z-10 mt-2 w-64 max-w-[80vw] rounded-xl border border-line bg-white p-1 shadow-[0_6px_12px_#11111114]">
-                {components.length === 0 ? (
-                  <p className="px-3 py-2 text-xs leading-relaxed text-smoke">
-                    No components in this space yet. Build one in Design first.
-                  </p>
-                ) : (
-                  components.map((component) => (
-                    <button
-                      key={component.id}
-                      type="button"
-                      onClick={() => insertComponent(component)}
-                      className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-[#1111110a]"
-                    >
-                      {component.name}
-                    </button>
-                  ))
-                )}
-                <Link
-                  href={`/dashboard/${space.slug}?view=design#components`}
-                  className="mt-1 block border-t border-line px-3 py-2 text-xs text-smoke hover:text-ink"
-                >
-                  Edit components in Design →
-                </Link>
-              </div>
-            </details>
-          </span>
-        </div>
-      </header>
-
-      <div className="doc-page">
-        <input
-          className="doc-title"
-          value={title}
-          maxLength={120}
-          aria-label="Page title"
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={(event) => commitTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              event.currentTarget.blur();
-            }
-          }}
-        />
-
-        <div
-          ref={attachCanvas}
-          className="doc"
-          contentEditable
-          role="textbox"
-          aria-multiline="true"
-          aria-label="Page body"
-          onInput={markDirty}
-          onPaste={(event) => {
-            event.preventDefault();
-            insertPasted(event.clipboardData);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            insertPasted(event.dataTransfer);
-          }}
-          onClick={(event) => selectIslandAt(event.target)}
-        />
-      </div>
-
-      {selected && (
-        <aside
-          aria-label={`${selected.name} block`}
-          className="fixed right-6 bottom-6 z-30 w-72 rounded-xl border border-line bg-card p-4 shadow-[0_6px_12px_#11111114]"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="badge">{selected.name}</span>
-            <button type="button" className="btn-quiet rounded-md" onClick={clearSelection}>
-              Done
-            </button>
-          </div>
-
-          <div className="mt-3 grid gap-3">
-            {selectedComponent && selectedComponent.props.length > 0 ? (
-              selectedComponent.props.map((prop) => (
-                <label key={prop.key} className="grid gap-1">
-                  <span className="label">{prop.label}</span>
-                  <input
-                    className="input"
-                    value={selected.values[prop.key] ?? prop.fallback}
-                    maxLength={300}
-                    onChange={(event) => editField(prop.key, event.target.value)}
-                  />
-                </label>
-              ))
-            ) : (
-              <p className="text-xs leading-relaxed text-smoke">
-                {selectedComponent
-                  ? "This component declares no props yet, so there is nothing to set."
-                  : "This component is no longer in the space, so it can only be removed."}
-              </p>
-            )}
-          </div>
-
-          <p className="mt-3 text-xs leading-relaxed text-smoke">
-            The page sets this component&apos;s content. How it looks comes from the design
-            system —{" "}
-            <Link href={`/dashboard/${space.slug}?view=design#components`} className="underline">
-              edit it in Design
-            </Link>
-            .
-          </p>
-
-          <button
-            type="button"
-            className="btn-quiet mt-2 w-full justify-center rounded-md"
-            onClick={removeBlock}
-          >
-            Remove from page
-          </button>
-        </aside>
-      )}
-    </main>
-  );
-}
-
-/** Toolbar buttons keep the selection: the canvas must never lose focus to them. */
-function Tool({
-  label,
-  title,
-  active,
-  onClick,
-}: {
-  label: string;
-  title: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      data-active={active ? "" : undefined}
-      className="tool"
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onClick}
-    >
-      {label}
-    </button>
+    <Puck
+      config={config}
+      data={initial as Data}
+      onChange={onChange}
+      // Rendered in the page itself rather than an iframe, so the canvas reads
+      // the app's own stylesheet and fonts without copying them across.
+      iframe={{ enabled: false }}
+      overrides={{
+        header: () => (
+          <header className="border-b border-line bg-paper">
+            <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
+              <Link href={`/dashboard/${space.slug}`} className="btn-quiet -ml-2 shrink-0 rounded-md">
+                ← {space.name}
+              </Link>
+              <input
+                className="min-w-0 flex-1 bg-transparent text-lg outline-none"
+                value={title}
+                maxLength={120}
+                aria-label="Page title"
+                onChange={(event) => setTitle(event.target.value)}
+                onBlur={(event) => commitTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+              <span
+                className={`text-xs ${status === "refused" ? "text-ink" : "text-smoke"}`}
+                aria-live="polite"
+              >
+                {statusLabel}
+              </span>
+              <Link
+                href={`/dashboard/${space.slug}?view=design#components`}
+                className="text-xs text-smoke hover:text-ink"
+              >
+                Edit components in Design →
+              </Link>
+            </div>
+          </header>
+        ),
+      }}
+    />
   );
 }

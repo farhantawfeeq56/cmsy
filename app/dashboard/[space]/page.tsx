@@ -172,8 +172,11 @@ function Spec({
 
 /** Each step drawn at its own size, so the ramp can be read rather than decoded. */
 function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
-  // Clamped: `display` is 3.5rem in the product, which would burst the rail.
-  const size = Math.min(parseFloat(step.size) || 1, 2.25);
+  // Scaled relative to the largest step rather than clamped to a ceiling:
+  // `display` is 3.5rem in the product, which would burst the rail, but
+  // clamping it would also flatten it into `h1` and misrepresent the ramp.
+  const largest = Math.max(...design.typography.map((s) => parseFloat(s.size) || 1));
+  const size = 1 + ((parseFloat(step.size) || 1) / largest) * 1.25;
 
   return (
     <li className="flex items-center gap-4 border-b border-line py-2.5 last:border-0">
@@ -199,18 +202,21 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
 /**
  * The rules every component is built to. Components and tokens are authored
  * through the MCP server; the choice of system is not, so it is made here.
- */async function DesignSystemSection({
+ */
+async function DesignSystemSection({
   spaceId,
   designSystemId,
+  className = "",
 }: {
   spaceId: string;
   designSystemId: string | null;
+  className?: string;
 }) {
   const systems = await listDesignSystems();
   const current = systems.find((system) => system.id === designSystemId);
 
   return (
-    <aside className="min-w-0 lg:sticky lg:top-10">
+    <aside className={`min-w-0 lg:sticky lg:top-10 ${className}`}>
       <div className="card p-5">
         <Spec label="Colors" count={design.colors.length}>
           <ul className="grid grid-cols-3 gap-x-2 gap-y-3">
@@ -376,13 +382,15 @@ function ComponentsSection({ components }: { components: ComponentRow[] }) {
 /* --------------------------------------------------------------------- view */
 
 /** Shared by both rows so the headings sit directly above the columns below. */
-const COLUMNS = "grid gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-10";
-
 /**
  * Components on the left, the system they are built to in a rail on the right.
- * One header row for both columns, so the grid and the rail start on the same
- * line instead of the rail floating up beside a heading. Below `lg` the rail
- * drops underneath.
+ *
+ * One grid, four placed items, rather than a headers row and a content row: two
+ * rows would collapse to heading, heading, content, content below `lg`, so the
+ * second heading would arrive detached from what it names. Placed explicitly,
+ * the DOM order stays heading, content, heading, content for narrow screens
+ * while `lg` pulls the two headings into one row and the two bodies into the
+ * next — so both columns start on the same line without either being nudged.
  */
 async function DesignView({
   spaceId,
@@ -394,29 +402,32 @@ async function DesignView({
   const components = await listComponents(spaceId);
 
   return (
-    <div>
-      <div className={COLUMNS}>
-        <div id="components" className="min-w-0 scroll-mt-6">
-          <h2 className="font-primary flex items-baseline gap-2 text-lg font-medium tracking-tight">
-            Components
-            <span className="text-xs font-normal text-smoke">{components.length}</span>
-          </h2>
-          <p className="mt-1 text-xs text-smoke">Add and change them with the MCP server.</p>
-        </div>
-
-        <div className="min-w-0">
-          <h2 className="font-primary text-lg font-medium tracking-tight">Design System</h2>
-          <p className="mt-1 text-xs text-smoke">
-            From <code className="rounded bg-[#1111110a] px-1 py-0.5">DESIGN.md</code> — the rules
-            every component here is built to.
-          </p>
-        </div>
+    <div className="grid items-start gap-x-10 gap-y-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <div id="components" className="min-w-0 scroll-mt-6 lg:col-start-1 lg:row-start-1">
+        <h2 className="font-primary flex items-baseline gap-2 text-lg font-medium tracking-tight">
+          Components
+          <span className="text-xs font-normal text-smoke">{components.length}</span>
+        </h2>
+        <p className="mt-1 text-xs text-smoke">Add and change them with the MCP server.</p>
       </div>
 
-      <div className={`mt-4 items-start ${COLUMNS}`}>
+      <div className="min-w-0 lg:col-start-1 lg:row-start-2">
         <ComponentsSection components={components} />
-        <DesignSystemSection spaceId={spaceId} designSystemId={designSystemId} />
       </div>
+
+      <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+        <h2 className="font-primary text-lg font-medium tracking-tight">Design System</h2>
+        <p className="mt-1 text-xs text-smoke">
+          From <code className="rounded bg-[#1111110a] px-1 py-0.5">DESIGN.md</code> — the rules
+          every component here is built to.
+        </p>
+      </div>
+
+      <DesignSystemSection
+        spaceId={spaceId}
+        designSystemId={designSystemId}
+        className="lg:col-start-2 lg:row-start-2"
+      />
     </div>
   );
 }

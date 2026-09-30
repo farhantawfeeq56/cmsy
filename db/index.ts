@@ -2,6 +2,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "../app/dashboard/[space]/design.generated.json";
 import type { Prop } from "./component-template";
+import { checkPageDoc, readPageDoc, type PageDoc } from "./page-doc";
 
 type Client = NeonQueryFunction<false, false>;
 let client: Client | null = null;
@@ -205,28 +206,40 @@ export async function getPage(spaceId: string, slug: string): Promise<PageDetail
 }
 
 /**
- * The document lives in `blocks` as `{ html }`. An untouched page still holds
- * the column default `[]`, so anything that is not a string body reads empty.
+ * A page's body, ready for the editor. `db/page-doc` owns the format: it reads
+ * the current block format, converts a body saved before blocks, and treats
+ * the column default `[]` as an empty page.
  */
-export function pageHtml(blocks: unknown) {
-  const html = (blocks as { html?: unknown } | null)?.html;
-  return typeof html === "string" ? html : "";
-}
+export const pageDoc = (blocks: unknown): PageDoc => readPageDoc(blocks);
+
+export type SavePageResult = { saved: true } | { saved: false; problems: string[] };
 
 /**
- * Replaces a page's document body. The body is HTML inside the `blocks` jsonb,
- * so an existing page needs no migration. Both writers — the editor's autosave
- * and the `set_page_blocks` MCP tool — come through here, so the cap is applied
- * once instead of by whichever caller remembered it.
+ * Replaces a page's body. Both writers — the editor's autosave and the
+ * `set_page_blocks` MCP tool — come through here, so the check runs once and
+ * neither can store a body the other would refuse. A body with any problem is
+ * refused whole rather than trimmed: saving the part that passed is how a page
+ * quietly loses the rest.
  */
-export async function setPageHtml(id: string, html: string) {
+export async function setPageDoc(id: string, value: unknown): Promise<SavePageResult> {
+  const { doc, problems } = checkPageDoc(value);
+  if (problems.length) return { saved: false, problems };
+
+  const json = JSON.stringify(doc);
+  if (json.length > LIMITS.pageBody) {
+    return {
+      saved: false,
+      problems: [`that body is ${json.length} characters; a page holds ${LIMITS.pageBody}`],
+    };
+  }
+
   const found = await rows<{ id: string }>(db()`
     update pages
-    set blocks = ${JSON.stringify({ html: html.slice(0, LIMITS.pageBody) })}::jsonb
+    set blocks = ${json}::jsonb
     where id = ${id}
     returning id
   `);
-  return found.length > 0;
+  return found.length > 0 ? { saved: true } : { saved: false, problems: ["that page does not exist"] };
 }
 
 export const listComponents = (spaceId: string) =>
@@ -263,7 +276,7 @@ export const LIMITS = {
   spaceName: 80,
   componentName: 80,
   componentDescription: 300,
-  /** ~200KB of HTML is already a very long page; the cap bounds a hostile save. */
+  /** ~200KB of stored JSON is already a very long page; the cap bounds a hostile save. */
   pageBody: 200_000,
 };
 

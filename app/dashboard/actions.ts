@@ -10,7 +10,8 @@ import {
   importComponent as copyComponent,
   insertWithSlug,
   LIMITS,
-  setPageHtml,
+  setPageDoc,
+  type SavePageResult,
   slugify,
   updateComponent as setComponent,
 } from "@/db";
@@ -74,16 +75,16 @@ export async function createPage(formData: FormData) {
 }
 
 /**
- * The document, autosaved from the Page editor. The body is stored as an HTML
- * string inside the `blocks` jsonb, so an existing page needs no migration.
- * Deliberately no `revalidatePath` on the editor's own route: a refresh while
- * someone is typing would fight the unsaved canvas for no benefit.
+ * The document, autosaved from the Page editor. `setPageDoc` checks the body
+ * against the block types and refuses it whole on any problem, and the editor
+ * shows why. Deliberately no `revalidatePath` on the editor's own route: a
+ * refresh while someone is typing would fight the unsaved canvas for no benefit.
  */
-export async function savePageBlocks(id: string, html: string) {
-  const pageId = uuid(id);
-  if (!pageId || typeof html !== "string") return;
+export async function savePageBlocks(id: string, doc: unknown): Promise<SavePageResult> {
+  const pageId = uuid(typeof id === "string" ? id : null);
+  if (!pageId) return { saved: false, problems: ["that is not a page id"] };
 
-  await setPageHtml(pageId, html);
+  return setPageDoc(pageId, doc);
 }
 
 /** Titles are edited in place, so this is submitted on blur and on Enter. */

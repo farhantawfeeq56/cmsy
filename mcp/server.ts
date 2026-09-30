@@ -18,13 +18,14 @@ import {
   listPages,
   listRecentActivity,
   listSpaces,
-  pageHtml,
-  setPageHtml,
+  setPageDoc,
   updateComponent,
 } from "../db";
 // The leaf module, not `../db`: it is pure and import-free, so a test that
 // replaces the database functions still exercises the real checker.
-import { CLASSES, pageHtmlProblems } from "../db/page-html";
+import { CLASSES } from "../db/page-html";
+// Pure as well, so the tests read and count bodies with the real rules.
+import { checkPageDoc, DOC_LIMITS, fromLegacyHtml, readPageDoc, type Block } from "../db/page-doc";
 // Also import-free, so a template is judged by the same rules the editor
 // enforces rather than by a second copy of them.
 import {
@@ -859,8 +860,36 @@ const pageRef = z.object({ id: z.string(), title: z.string(), slug: z.string() }
 const pageBodyOutput = z.object({
   space: spaceRef,
   page: pageRef,
-  html: z.string(),
+  doc: z.record(z.string(), z.unknown()),
 });
+
+/**
+ * The block types, as an agent needs to write them. The rules themselves live
+ * in `db/page-doc`; this is only the description of them.
+ */
+const BLOCK_GUIDE =
+  "A page body is { version: 2, root: { props: {} }, content: Block[] }. Each block is " +
+  "{ type, props } and every block's props carry a unique string id. The types are: " +
+  "Text { id, text } where text is HTML — paragraphs, headings, lists, quotes, links, " +
+  "bold/italic/underline and images, with no classes, data- attributes or divs; " +
+  "Image { id, src, alt }; Section { id, content: Block[] }; " +
+  "Columns { id, left: Block[], right: Block[] }; and " +
+  "Component { id, componentId, values } where componentId is from list_components and " +
+  "values maps the component's prop keys to strings. " +
+  `Blocks nest at most ${DOC_LIMITS.depth} deep, and a page holds at most ${DOC_LIMITS.blocks}.`;
+
+const countBlocks = (content: Block[]): number =>
+  content.reduce(
+    (total, block) =>
+      total +
+      1 +
+      (block.type === "Section"
+        ? countBlocks(block.props.content)
+        : block.type === "Columns"
+          ? countBlocks(block.props.left) + countBlocks(block.props.right)
+          : 0),
+    0,
+  );
 
 function registerGetPage(server: McpServer) {
   server.registerTool(
@@ -868,10 +897,10 @@ function registerGetPage(server: McpServer) {
     {
       title: "Get page",
       description:
-        "Read one page's document body as HTML, by space and page slug. The body " +
-        "is the markup the editor edits: paragraphs, headings, lists, links, " +
-        "images and component blocks. Read it before changing a page, and send " +
-        "the whole document back to set_page_blocks to write it.",
+        "Read one page's body as blocks, by space and page slug. A page saved " +
+        "before blocks existed comes back converted. Read it before changing a " +
+        "page, and send the whole body back to set_page_blocks to write it. " +
+        BLOCK_GUIDE,
       inputSchema: pageInput,
       outputSchema: pageBodyOutput,
       annotations: { readOnlyHint: true, idempotentHint: true },
@@ -883,13 +912,18 @@ function registerGetPage(server: McpServer) {
       const page = await getPage(space.id, pageSlug);
       if (!page) return pageNotFound(pageSlug, space.name);
 
-      const html = pageHtml(page.blocks);
+      const doc = readPageDoc(page.blocks);
       return {
-        content: [{ type: "text" as const, text: html || `${page.title} is empty.` }],
+        content: [
+          {
+            type: "text" as const,
+            text: doc.content.length ? JSON.stringify(doc) : `${page.title} is empty.`,
+          },
+        ],
         structuredContent: {
           space: { name: space.name, slug: space.slug },
           page: { id: page.id, title: page.title, slug: page.slug },
-          html,
+          doc,
         },
       };
     },
@@ -899,7 +933,7 @@ function registerGetPage(server: McpServer) {
 const setPageBodyOutput = z.object({
   space: spaceRef,
   page: pageRef,
-  characters: z.number().int(),
+  blocks: z.number().int(),
   replaced: z.boolean(),
 });
 
@@ -909,54 +943,58 @@ function registerSetPageBlocks(server: McpServer) {
     {
       title: "Set page blocks",
       description:
-        "Replace a page's entire document body with HTML, by space and page slug. " +
-        "This replaces rather than merges, so read the page with get_page first " +
-        "and send back the full document. Markup the editor cannot keep is " +
-        "refused with the reason, instead of being saved and then silently " +
-        "dropped the next time someone opens the page.",
+        "Replace a page's entire body, by space and page slug. This replaces " +
+        "rather than merges, so read the page with get_page first and send back " +
+        "the full body as doc. A body with anything the editor cannot keep — an " +
+        "unknown block type, a prop of the wrong type, markup outside the " +
+        "allowlist — is refused whole, with the reasons, and nothing is saved. " +
+        "html is still accepted for a body written the old way: it is converted " +
+        "to blocks and checked the same way. " +
+        BLOCK_GUIDE,
       inputSchema: pageInput.extend({
-        html: z.string().describe("The complete document body, as HTML."),
+        doc: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("The complete page body, as blocks. Send this or html, not both."),
+        html: z
+          .string()
+          .optional()
+          .describe("A complete body as HTML, converted to blocks. Send this or doc, not both."),
       }),
       outputSchema: setPageBodyOutput,
       // Replaces content rather than adding to it, so it is destructive even
       // though sending the same document twice leaves the same document.
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     },
-    async ({ space: slug, page: pageSlug, html }) => {
+    async ({ space: slug, page: pageSlug, doc, html }) => {
+      if ((doc === undefined) === (html === undefined)) {
+        return toolError("Send the body as doc or as html — exactly one of them.");
+      }
+
       const space = await getSpace(slug);
       if (!space) return spaceNotFound(slug);
 
       const page = await getPage(space.id, pageSlug);
       if (!page) return pageNotFound(pageSlug, space.name);
 
-      const problems = pageHtmlProblems(html);
-      if (problems.length) {
+      const body = doc ?? fromLegacyHtml(html ?? "");
+      const result = await setPageDoc(page.id, body);
+      if (!result.saved) {
         return toolError(
-          `The editor cannot keep all of that, so nothing was saved:\n- ${problems.join("\n- ")}`,
+          `The editor cannot keep all of that, so nothing was saved:\n- ${result.problems.join("\n- ")}`,
         );
       }
 
-      // Refused rather than trimmed: `setPageHtml` caps the body, and a document
-      // cut at an arbitrary offset can split a tag or an escaped attribute. A
-      // caller that is told nothing would have no way to know its write was
-      // mangled, which is worse than a refusal it can shorten and retry.
-      if (html.length > LIMITS.pageBody) {
-        return toolError(
-          `That document is ${html.length} characters; a page holds ${LIMITS.pageBody}. ` +
-            "Nothing was saved — split it across pages, or trim it and try again.",
-        );
-      }
-
-      const replaced = await setPageHtml(page.id, html);
+      const blocks = countBlocks(checkPageDoc(body).doc.content);
       return {
         content: [
-          { type: "text" as const, text: `Saved ${page.title} in ${space.name} (${html.length} characters).` },
+          { type: "text" as const, text: `Saved ${page.title} in ${space.name} (${blocks} blocks).` },
         ],
         structuredContent: {
           space: { name: space.name, slug: space.slug },
           page: { id: page.id, title: page.title, slug: page.slug },
-          characters: html.length,
-          replaced,
+          blocks,
+          replaced: true,
         },
       };
     },

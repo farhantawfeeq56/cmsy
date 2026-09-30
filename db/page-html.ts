@@ -1,21 +1,21 @@
 /**
- * The shape a page document is allowed to take, plus a checker for markup that
- * would not survive it.
+ * The markup a page may hold, plus a checker for markup that would not survive
+ * it.
  *
- * This lives beside `pageHtml` and `LIMITS` because it is the contract for the
- * `pages.blocks` column, not a detail of any one editor. Everything that writes
- * a body — the dashboard's autosave and the `set_page_blocks` MCP tool — reads
- * its rules from here, so the two cannot disagree about what a page may hold.
+ * A page body is blocks now (`db/page-doc`), and this is the allowlist those
+ * blocks' HTML is judged by: a Text block's rich text, a component's template,
+ * and a body saved before blocks existed. Everything that writes a body — the
+ * editor's autosave and the `set_page_blocks` MCP tool — reaches these rules
+ * through `setPageDoc`, so the two cannot disagree about what a page may hold.
  *
  * It must stay import-free. The editor is a client component and pulls this
  * module into the browser bundle, so anything reached from here ships to the
  * browser too; a `db()` import would drag the Postgres driver along with it.
  *
- * The editor's `sanitize` *rebuilds* markup through these tables using the
- * browser's `DOMParser`, which a server does not have. `pageHtmlProblems`
- * cannot rebuild anything, so it does the weaker thing a server can do: report
- * what `sanitize` would throw away. That is enough to stop a writer saving a
- * document that comes back half missing when the page is next opened.
+ * The old contenteditable editor rebuilt markup through these tables with the
+ * browser's `DOMParser` (`sanitize`, `clean`), which is why some notes below
+ * still name them. `pageHtmlProblems` cannot rebuild anything, so it does the
+ * weaker thing a server can do: report what that rebuild would throw away.
  */
 
 /** Tags whose whole subtree goes: keeping the text of a `<script>` is noise. */

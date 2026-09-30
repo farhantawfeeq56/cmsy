@@ -18,16 +18,11 @@ vi.mock("../db", () => ({
   listPages: vi.fn(),
   listRecentActivity: vi.fn(),
   listSpaces: vi.fn(),
-  // The real one is two lines and has its own suite; the readers below just
-  // need the column default (`[]`) to read as empty.
-  pageHtml: (blocks: { html?: unknown } | null) =>
-    typeof blocks?.html === "string" ? blocks.html : "",
-  setPageHtml: vi.fn(),
+  setPageDoc: vi.fn(),
   updateComponent: vi.fn(),
 }));
 
 const db = await import("../db");
-const { LIMITS } = db;
 const { createCmsyMcpServer } = await import("./server");
 const handler = createMcpHandler(createCmsyMcpServer);
 
@@ -319,9 +314,21 @@ describe("list_recent_activity", () => {
 });
 
 const PRICING = { id: "p1", title: "Pricing", slug: "pricing", blocks: { html: "<p>Simple</p>" } };
+const HERO = "5f0e1b1a-0000-4000-8000-000000000001";
+const DOC = (...content: unknown[]) => ({ version: 2, root: { props: {} }, content });
+
+// The write is replaced, but the rules it applies are the real, pure ones, so
+// what a tool refuses here is what the database function would refuse.
+beforeEach(async () => {
+  const { checkPageDoc } = await import("../db/page-doc");
+  vi.mocked(db.setPageDoc).mockImplementation(async (_id, value) => {
+    const { problems } = checkPageDoc(value);
+    return problems.length ? { saved: false, problems } : { saved: true };
+  });
+});
 
 describe("get_page", () => {
-  it("returns the stored body by space and page slug", async () => {
+  it("returns the stored body as blocks, converting one saved before blocks", async () => {
     vi.mocked(db.getPage).mockResolvedValue(PRICING);
     const result = await call("get_page", { space: "docs", page: "pricing" });
 
@@ -329,14 +336,14 @@ describe("get_page", () => {
     expect(result.structuredContent).toMatchObject({
       space: { slug: "docs" },
       page: { title: "Pricing", slug: "pricing" },
-      html: "<p>Simple</p>",
+      doc: DOC({ type: "Text", props: { id: "legacy-text-0", text: "<p>Simple</p>" } }),
     });
   });
 
   it("reads the column default as an empty body rather than failing", async () => {
     vi.mocked(db.getPage).mockResolvedValue({ ...PRICING, blocks: [] });
     const result = await call("get_page", { space: "docs", page: "pricing" });
-    expect(result.structuredContent).toMatchObject({ html: "" });
+    expect(result.structuredContent).toMatchObject({ doc: DOC() });
   });
 
   it("is a tool error for an unknown page, naming the space", async () => {
@@ -355,60 +362,88 @@ describe("get_page", () => {
 });
 
 describe("set_page_blocks", () => {
-  it("saves a document the editor can keep", async () => {
+  it("saves a body of blocks, nested ones included", async () => {
     vi.mocked(db.getPage).mockResolvedValue(PRICING);
-    vi.mocked(db.setPageHtml).mockResolvedValue(true);
-    const html = "<h2>Plans</h2><p>From $0.</p>";
+    const doc = DOC(
+      { type: "Text", props: { id: "t1", text: "<h2>Plans</h2><p>From $0.</p>" } },
+      {
+        type: "Columns",
+        props: {
+          id: "c1",
+          left: [{ type: "Component", props: { id: "k1", componentId: HERO, values: { heading: "Hi" } } }],
+          right: [{ type: "Image", props: { id: "i1", src: "/plan.png", alt: "" } }],
+        },
+      },
+    );
 
-    const result = await call("set_page_blocks", { space: "docs", page: "pricing", html });
+    const result = await call("set_page_blocks", { space: "docs", page: "pricing", doc });
 
-    expect(db.setPageHtml).toHaveBeenCalledWith("p1", html);
-    expect(result.structuredContent).toMatchObject({ characters: html.length, replaced: true });
+    expect(db.setPageDoc).toHaveBeenCalledWith("p1", doc);
+    expect(result.structuredContent).toMatchObject({ blocks: 4, replaced: true });
   });
 
-  it("refuses markup the editor would strip, and writes nothing", async () => {
+  it("refuses a hostile body whole, with the reasons", async () => {
     vi.mocked(db.getPage).mockResolvedValue(PRICING);
     const result = await call("set_page_blocks", {
       space: "docs",
       page: "pricing",
-      html: "<p>ok</p><script>alert(1)</script>",
+      doc: DOC(
+        { type: "Text", props: { id: "t1", text: "<p>ok</p><script>alert(1)</script>" } },
+        { type: "Iframe", props: { id: "x1" } },
+        { type: "Image", props: { id: "i1", src: "javascript:alert(1)", alt: 3 } },
+      ),
     });
 
     expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("nothing was saved");
     expect(result.content[0].text).toContain("<script>");
-    expect(db.setPageHtml).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('"Iframe" is not a block type');
+    expect(result.content[0].text).toContain("src is not a safe link");
+    expect(result.content[0].text).toContain("alt must be a string");
   });
 
-  it("accepts the markup get_page just returned, so a read-write round trip holds", async () => {
+  it("accepts the body get_page just returned, so a read-write round trip holds", async () => {
     const stored =
-      '<div data-block="component" data-block-id="5f0e1b1a-0000-4000-8000-000000000000" data-component-id="5f0e1b1a-0000-4000-8000-000000000001" data-name="Hero" data-values="{&quot;heading&quot;:&quot;Hi&quot;}" contenteditable="false" class="comp-block"><span data-block-name class="badge">Hero</span></div>';
+      '<p>Intro</p><div data-block="component" data-block-id="5f0e1b1a-0000-4000-8000-000000000000" data-component-id="5f0e1b1a-0000-4000-8000-000000000001" data-name="Hero" data-values="{&quot;heading&quot;:&quot;Hi&quot;}" contenteditable="false" class="comp-block"><span data-block-name class="badge">Hero</span></div>';
     vi.mocked(db.getPage).mockResolvedValue({ ...PRICING, blocks: { html: stored } });
-    vi.mocked(db.setPageHtml).mockResolvedValue(true);
 
     const read = await call("get_page", { space: "docs", page: "pricing" });
-    const html = (read.structuredContent as { html: string }).html;
-    const result = await call("set_page_blocks", { space: "docs", page: "pricing", html });
+    const doc = (read.structuredContent as { doc: Record<string, unknown> }).doc;
+    const result = await call("set_page_blocks", { space: "docs", page: "pricing", doc });
 
     expect(result.isError).toBeUndefined();
-    expect(db.setPageHtml).toHaveBeenCalledWith("p1", stored);
+    expect(db.setPageDoc).toHaveBeenCalledWith("p1", doc);
+    expect(result.structuredContent).toMatchObject({ blocks: 2 });
   });
 
-  it("refuses a document too long to store, rather than trimming it", async () => {
+  it("still takes a body as html, converted to blocks and checked the same way", async () => {
     vi.mocked(db.getPage).mockResolvedValue(PRICING);
-    const html = `<p>${"x".repeat(LIMITS.pageBody)}</p>`;
 
-    const result = await call("set_page_blocks", { space: "docs", page: "pricing", html });
+    const saved = await call("set_page_blocks", { space: "docs", page: "pricing", html: "<p>Hi</p>" });
+    expect(saved.isError).toBeUndefined();
+    expect(db.setPageDoc).toHaveBeenCalledWith(
+      "p1",
+      DOC({ type: "Text", props: { id: "legacy-text-0", text: "<p>Hi</p>" } }),
+    );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(String(LIMITS.pageBody));
-    expect(result.content[0].text).toContain(String(html.length));
-    expect(db.setPageHtml).not.toHaveBeenCalled();
+    const refused = await call("set_page_blocks", { space: "docs", page: "pricing", html: "<p onclick=x>Hi</p>" });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0].text).toContain("onclick");
+  });
+
+  it("asks for exactly one of doc and html", async () => {
+    for (const body of [{}, { doc: DOC(), html: "<p>x</p>" }]) {
+      const result = await call("set_page_blocks", { space: "docs", page: "pricing", ...body });
+      expect(result.isError).toBe(true);
+    }
+    expect(db.setPageDoc).not.toHaveBeenCalled();
   });
 
   it("does not write to a page that does not exist", async () => {
     vi.mocked(db.getPage).mockResolvedValue(null);
-    const result = await call("set_page_blocks", { space: "docs", page: "nope", html: "<p>x</p>" });
+    const result = await call("set_page_blocks", { space: "docs", page: "nope", doc: DOC() });
     expect(result.isError).toBe(true);
-    expect(db.setPageHtml).not.toHaveBeenCalled();
+    expect(db.setPageDoc).not.toHaveBeenCalled();
   });
 });
+

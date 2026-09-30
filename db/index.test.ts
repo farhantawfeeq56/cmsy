@@ -115,44 +115,67 @@ describe("authenticateMcpToken", () => {
   });
 });
 
-describe("pageHtml", () => {
-  it("reads the html body of a saved page", async () => {
-    const { pageHtml } = await load();
-    expect(pageHtml({ html: "<p>Hi</p>" })).toBe("<p>Hi</p>");
+const TEXT = (id: string, text: string) => ({ type: "Text", props: { id, text } });
+const DOC = (...content: unknown[]) => ({ version: 2, root: { props: {} }, content });
+
+describe("pageDoc", () => {
+  it("reads a body in the block format as stored", async () => {
+    const { pageDoc } = await load();
+    const doc = DOC(TEXT("t1", "<p>Hi</p>"));
+    expect(pageDoc(doc)).toEqual(doc);
+  });
+
+  it("converts a body saved before blocks", async () => {
+    const { pageDoc } = await load();
+    expect(pageDoc({ html: "<p>Hi</p>" }).content).toEqual([
+      { type: "Text", props: { id: "legacy-text-0", text: "<p>Hi</p>" } },
+    ]);
   });
 
   it("treats the column default and anything malformed as empty", async () => {
-    const { pageHtml } = await load();
-    expect(pageHtml([])).toBe("");
-    expect(pageHtml(null)).toBe("");
-    expect(pageHtml({ html: 42 })).toBe("");
+    const { pageDoc } = await load();
+    for (const blocks of [[], null, { html: 42 }, "x"]) {
+      expect(pageDoc(blocks).content).toEqual([]);
+    }
   });
 });
 
-describe("setPageHtml", () => {
+describe("setPageDoc", () => {
   it("binds the body and the page id rather than splicing either into the SQL", async () => {
     nextRows = [{ id: "p1" }];
-    const { setPageHtml, LIMITS } = await load();
-    const hostile = "</p><script>drop table pages</script>";
+    const { setPageDoc, LIMITS } = await load();
+    const doc = DOC(TEXT("t1", "<p>drop table pages</p>"));
 
-    expect(await setPageHtml("p1", hostile)).toBe(true);
-    expect(calls[0].values).toEqual([JSON.stringify({ html: hostile }), "p1"]);
-    expect(calls[0].sql).not.toContain(hostile);
+    expect(await setPageDoc("p1", doc)).toEqual({ saved: true });
+    expect(calls[0].values).toEqual([JSON.stringify(doc), "p1"]);
+    expect(calls[0].sql).not.toContain("drop table");
     expect(LIMITS.pageBody).toBe(200_000);
   });
 
-  it("caps the stored body at the shared limit, for every caller", async () => {
-    nextRows = [{ id: "p1" }];
-    const { setPageHtml, LIMITS } = await load();
+  it("refuses a body with any problem, for every caller, and writes nothing", async () => {
+    const { setPageDoc } = await load();
+    const result = await setPageDoc("p1", DOC(TEXT("t1", "<p>ok</p><script>x</script>"), { type: "Marquee", props: { id: "m" } }));
 
-    await setPageHtml("p1", "x".repeat(LIMITS.pageBody + 50));
-    const stored = JSON.parse(calls[0].values[0] as string) as { html: string };
-    expect(stored.html).toHaveLength(LIMITS.pageBody);
+    expect(result.saved).toBe(false);
+    expect(result.saved ? [] : result.problems).toEqual(
+      expect.arrayContaining([expect.stringContaining("<script>"), expect.stringContaining('"Marquee"')]),
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses a body too long to store, rather than trimming it", async () => {
+    const { setPageDoc, LIMITS } = await load();
+    const long = Array.from({ length: 10 }, (_, i) => TEXT(`t${i}`, `<p>${"x".repeat(LIMITS.pageBody / 10)}</p>`));
+
+    const result = await setPageDoc("p1", DOC(...long));
+    expect(result.saved).toBe(false);
+    expect(result.saved ? "" : result.problems[0]).toContain(String(LIMITS.pageBody));
+    expect(calls).toHaveLength(0);
   });
 
   it("reports a page that is not there instead of claiming a save", async () => {
-    const { setPageHtml } = await load();
-    expect(await setPageHtml("missing", "<p>x</p>")).toBe(false);
+    const { setPageDoc } = await load();
+    expect(await setPageDoc("missing", DOC())).toMatchObject({ saved: false });
   });
 });
 

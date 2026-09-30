@@ -197,8 +197,6 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
   );
 }
 
-/* -------------------------------------------------------------- design system */
-
 /**
  * The rules every component is built to. Components and tokens are authored
  * through the MCP server; the choice of system is not, so it is made here.
@@ -278,8 +276,10 @@ async function DesignSystemSection({
         </details>
 
         {/* The MCP has no setter for this, so the choice is made here — a plain
-            form rather than the old popover, since it is not the rail's point. */}
-        {systems.length > 0 && (
+            form rather than the old popover, since it is not the rail's point.
+            Hidden when the space already points at the only system there is:
+            the one available action would be to reselect it. */}
+        {(!current || systems.length > 1) && (
           <form action={useDesignSystem} className="mt-5 border-t border-line pt-4">
             <input type="hidden" name="spaceId" value={spaceId} />
             <label className="label block" htmlFor="design-system">
@@ -381,7 +381,6 @@ function ComponentsSection({ components }: { components: ComponentRow[] }) {
 
 /* --------------------------------------------------------------------- view */
 
-/** Shared by both rows so the headings sit directly above the columns below. */
 /**
  * Components on the left, the system they are built to in a rail on the right.
  *

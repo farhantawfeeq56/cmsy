@@ -52,7 +52,7 @@ function Snippet({ title, hint, code }: { title: string; hint: string; code: str
     <section className="min-w-0 rounded-xl border border-line bg-card">
       <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium">{title}</h3>
+          <h3 className="text-sm font-semibold">{title}</h3>
           <p className="mt-0.5 text-xs text-smoke">{hint}</p>
         </div>
         <CopyButton value={code} />
@@ -129,7 +129,7 @@ export function ConnectPanel({
   return (
     <>
       <section className="mt-10">
-        <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">
+        <h2 className="text-2xl font-semibold tracking-[-0.01em]">
           {needsToken ? "1. Issue a token" : "Tokens"}
         </h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-smoke">
@@ -180,7 +180,7 @@ export function ConnectPanel({
       </section>
 
       <section className="mt-10">
-        <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">
+        <h2 className="text-2xl font-semibold tracking-[-0.01em]">
           {needsToken ? "2. Paste into your client" : "Paste into your client"}
         </h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-smoke">

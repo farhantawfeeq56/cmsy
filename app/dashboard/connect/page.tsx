@@ -23,7 +23,7 @@ export default async function ConnectPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
       <header>
-        <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
+        <h1 className="font-display text-4xl font-normal tracking-[-0.02em]">
           Connect your agent.
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-smoke">
@@ -60,7 +60,7 @@ export default async function ConnectPage() {
       <TokenList tokens={tokens} />
 
       <section className="mt-12 border-t border-line pt-8">
-        <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">How auth works</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em]">How auth works</h2>
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-line bg-card p-5">
             <dt className="text-sm font-medium">Loopback — no token</dt>
@@ -97,7 +97,7 @@ export default async function ConnectPage() {
 function TokenList({ tokens }: { tokens: Awaited<ReturnType<typeof listMcpTokens>> }) {
   return (
     <section className="mt-12">
-      <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Your tokens</h2>
+      <h2 className="text-2xl font-semibold tracking-[-0.01em]">Your tokens</h2>
 
       {tokens.length === 0 ? (
         <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">

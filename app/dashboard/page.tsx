@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="font-primary text-4xl font-normal tracking-[-0.02em]">
+          <h1 className="font-display text-4xl font-normal tracking-[-0.02em]">
             Your spaces.
           </h1>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-smoke">
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="mt-12 border-t border-line pt-8">
-        <h2 className="font-primary text-2xl font-normal tracking-[-0.01em]">Recent Activity</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em]">Recent Activity</h2>
 
         {activity.length === 0 ? (
           <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
                 >
                   <span
                     aria-hidden
-                    className={`font-primary flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
                       TILES[item.kind === "page" ? 0 : 2]
                     }`}
                   >

@@ -64,9 +64,9 @@
     },
     {
       "name": "h2",
-      "font": "Nohemi",
+      "font": "Plus Jakarta Sans",
       "size": "1.75rem",
-      "weight": "400"
+      "weight": "600"
     },
     {
       "name": "body-md",
@@ -111,7 +111,8 @@
         "CMSy sits between a codebase and a visual editing interface: a Components",
         "Editor for AI-assisted building and a No-Code Editor for structured content",
         "like posts and landing copy. The UI pairs a warm paper canvas with",
-        "near-black ink headlines set in Nohemi, plus soft pastel signals for",
+        "near-black ink headlines set in Nohemi — reserved for hero statements and",
+        "page titles — plus soft pastel signals for",
         "status and categorization. The feel is a calm workbench — quiet surfaces,",
         "one strong dark button, no gradients on core UI.",
         "",
@@ -142,16 +143,25 @@
       "title": "Typography",
       "lines": [
         "",
-        "Nohemi (variable, `--font-nohemi`) for display and headings; Plus Jakarta",
-        "Sans (`--font-secondary`) for body copy and all UI chrome — nav, buttons,",
-        "labels, badges. Tight tracking on Nohemi headlines, relaxed on Jakarta",
-        "body. Geist and Source Sans are retired — do not use them.",
+        "Nohemi (variable, `--font-nohemi`) is the **display face and nothing else**:",
+        "hero statements and page titles, `.font-display` — at 400 for a statement or a",
+        "heading, where the size does the work, and at 600 only for the CMSy wordmark,",
+        "which is a logotype rather than a heading. Plus Jakarta Sans",
+        "(`--font-secondary`) carries everything else, and it is a variable face from",
+        "200 to 800, so the ramp is carried by **weight as well as size**:",
         "",
-        "- **Display (Nohemi, 3.5rem / 1.0 / -2.8px):** Hero statements, one per viewport.",
-        "- **H1 (Nohemi, 2.75rem / 1.1):** Page and editor titles.",
-        "- **H2 (Nohemi, 1.75rem / 1.1):** Section and panel titles.",
-        "- **Body-md (Jakarta, 1rem / 1.3):** Paragraphs and agent instructions, max ~35rem measure.",
-        "- **Label (Jakarta, 0.875rem / medium):** Buttons, nav links, pills, code tags.",
+        "- **Display (Nohemi, 3.5rem / 400 / -2.8px):** Hero statements, one per viewport.",
+        "- **H1 (Nohemi, 2.75rem / 400 / 1.1):** Page titles only — one per view.",
+        "- **H2 (Jakarta, 1.75rem / 600):** Section and panel titles.",
+        "- **Body-md (Jakarta, 1rem / 400):** Paragraphs and agent instructions, max ~35rem measure.",
+        "- **Label (Jakarta, 0.875rem / 500):** Form-field names in `.label`, plus",
+        "  buttons, nav links, pills and code tags.",
+        "",
+        "Card and sub-section titles are Jakarta 600, one step down in size from the H2.",
+        "Within the editor canvas `.doc h1` keeps the display face at 400; `.doc h2` and",
+        "`.doc h3` are Jakarta 600. Body and meta text is 400, a name or an action is",
+        "500, a heading is 600. Tight tracking on Nohemi headlines, relaxed on Jakarta",
+        "body. Geist and Source Sans are retired — do not use them.",
         "",
         ""
       ]
@@ -218,8 +228,9 @@
       "title": "Do's and Don'ts",
       "lines": [
         "",
-        "- Do set headlines in Nohemi with negative tracking and body/UI in Plus",
-        "  Jakarta Sans; don't reintroduce Geist or a system serif.",
+        "- Do reserve Nohemi for hero statements, the wordmark and page titles, and set",
+        "  every other heading in Jakarta semibold; don't reintroduce Geist or a system",
+        "  serif.",
         "- Do keep editor copy on Neutral/Surface with ink text; don't put body",
         "  copy on blue, orange, or pastel fills.",
         "- Do use white text only on ink/charcoal; don't place white text on",
@@ -262,9 +273,9 @@
         "letterSpacing": "-1.76px"
       },
       "h2": {
-        "fontFamily": "Nohemi",
+        "fontFamily": "Plus Jakarta Sans",
         "fontSize": "1.75rem",
-        "fontWeight": "400",
+        "fontWeight": "600",
         "lineHeight": "1.1",
         "letterSpacing": "-0.48px"
       },

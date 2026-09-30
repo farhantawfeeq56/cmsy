@@ -34,7 +34,7 @@ export default function Home() {
       {/* Floating nav */}
       <header className="sticky top-4 z-10 mx-auto w-full max-w-5xl px-4">
         <nav className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card/90 py-3 pl-5 pr-3 backdrop-blur">
-          <a href="#" className="font-primary text-lg font-semibold tracking-tight">
+          <a href="#" className="font-display text-lg font-semibold tracking-tight">
             CMSy
           </a>
           <div className="hidden items-center gap-6 text-sm font-medium text-smoke sm:flex">
@@ -64,7 +64,7 @@ export default function Home() {
             <span className="inline-block size-3 rounded-full bg-[var(--accent)]" />
             AI-native CMS for codebases
           </p>
-          <h1 className="font-primary mt-6 max-w-3xl text-5xl font-normal leading-[1.05] tracking-[-0.03em] sm:text-7xl">
+          <h1 className="font-display mt-6 max-w-3xl text-5xl font-normal leading-[1.05] tracking-[-0.03em] sm:text-7xl">
             Edit content. Build components. Ship.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-smoke">
@@ -96,7 +96,7 @@ export default function Home() {
 
         {/* Editors */}
         <section id="editors" className="scroll-mt-24 pb-20">
-          <h2 className="font-primary text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
+          <h2 className="text-center text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
             Two editors, one codebase
           </h2>
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -110,7 +110,7 @@ export default function Home() {
                 >
                   {f.badge}
                 </span>
-                <h3 className="font-primary mt-4 text-xl font-medium tracking-tight">
+                <h3 className="mt-4 text-xl font-semibold tracking-tight">
                   {f.title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-smoke">
@@ -126,7 +126,7 @@ export default function Home() {
           id="flow"
           className="scroll-mt-24 rounded-2xl bg-card px-6 py-14 sm:px-12"
         >
-          <h2 className="font-primary text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
+          <h2 className="text-center text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
             Design → Instruction → Agent → Codebase
           </h2>
           <ol className="mt-10 grid gap-4 sm:grid-cols-4">
@@ -136,7 +136,7 @@ export default function Home() {
                 className="rounded-xl border border-line bg-paper p-5"
               >
                 <p className="text-xs font-medium text-smoke">{s.n}</p>
-                <h3 className="font-primary mt-1 font-medium tracking-tight">{s.title}</h3>
+                <h3 className="mt-1 font-semibold tracking-tight">{s.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-smoke">
                   {s.text}
                 </p>
@@ -147,7 +147,7 @@ export default function Home() {
 
         {/* Why */}
         <section id="why" className="scroll-mt-24 py-20">
-          <h2 className="font-primary mx-auto max-w-xl text-center text-3xl font-normal tracking-[-0.02em] sm:text-4xl">
+          <h2 className="mx-auto max-w-xl text-center text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
             Not a CMS bolted on. A layer built in.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-center leading-relaxed text-smoke">
@@ -164,7 +164,7 @@ export default function Home() {
             <p className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium">
               CMSy
             </p>
-            <h2 className="font-primary mt-5 max-w-xl text-3xl font-normal tracking-[-0.02em] sm:text-5xl">
+            <h2 className="font-display mt-5 max-w-xl text-3xl font-normal tracking-[-0.02em] sm:text-5xl">
               Give your agents — and your team — one surface.
             </h2>
             <Link
@@ -179,7 +179,7 @@ export default function Home() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-smoke sm:flex-row">
-          <p className="font-primary font-medium text-ink">CMSy</p>
+          <p className="font-display font-medium text-ink">CMSy</p>
           <p>Code-connected content for AI-built codebases.</p>
         </div>
       </footer>

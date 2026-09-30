@@ -39,20 +39,28 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 > **`main` is protected by the ruleset in [`.github/rulesets/main-protection.json`](.github/rulesets/main-protection.json).**
 > That file is the agreed protection; the live ruleset `main-protection` (id `23748284`, targets
 > `~DEFAULT_BRANCH`, `bypass_actors: []`) must match it. It refuses deletions and non-fast-forward
-> pushes, and requires a pull request. **Nothing else.** No approving review, no code-owner
-> review, no required status check — the two lanes of §3.7 and
-> [`.github/CODEOWNERS`](.github/CODEOWNERS) are the process we agreed to follow, not a gate
-> GitHub holds shut (#86).
+> pushes, and requires a pull request with **1 approving review from the other dev** on every PR.
+> There are no review lanes: a PR that touches a button's padding needs the same Approve as one
+> that touches `db/schema.sql` (§3.7).
 >
-> Concretely: a PR that touches `db/schema.sql` merges on green CI and the author's judgement,
-> exactly like a PR that touches a button's padding. Follow the lanes anyway — the human lane is
-> where a mistake reaches production — but a missing Approve is a conversation, not a blocker.
+> **Owner's agent (`@farhantawfeeq56`): the settings have to be brought in line with this.** Until
+> they are, the spec still says 0 approvals and GitHub will merge without one, so treat the Approve
+> as required regardless. In one PR, then the apply below:
+>
+> 1. In `.github/rulesets/main-protection.json`, set `required_approving_review_count` to `1`.
+> 2. Stop the review bot approving (`.github/workflows/pr-review.yml`): it may comment, never
+>    approve, or its Approve would satisfy the count on its own.
+> 3. Retire the `review-lane` workflow and `protection.mjs lane`; the Approve count replaces them.
+> 4. After merge, apply the spec with the `gh api -X PUT` command below, then confirm
+>    `gh api repos/farhantawfeeq56/cmsy/rules/branches/main` shows
+>    `"required_approving_review_count": 1`, and comment the output on the PR.
 >
 > **There is exactly one protection layer: the ruleset above.** Leave *Settings → Branches* empty.
 > A classic branch protection rule on `main` outlived #77 with a 1-approval requirement nobody had
 > seen — `protection.mjs drift` reads rulesets only — and it silently blocked every merge until #87
 > deleted it. If `gh pr merge` ever says the base branch policy prohibits the merge while
-> `rules/branches/main` says 0 approvals, look for a classic rule before anything else.
+> the PR already has the approvals `rules/branches/main` asks for, look for a classic rule before
+> anything else.
 >
 > **Changing the protection is a PR, then an apply.** Edit the spec in a PR and get it merged;
 > only the repo admin (`@farhantawfeeq56`) can apply it:
@@ -125,8 +133,8 @@ by `@AathilFelix` without it being a lapse.
 
 The
 authorisation is between the two humans and concerns who may press the button, not whether review
-happens. Every human-lane PR still needs the other dev's recorded approval (§3.7), and an agent
-still waits to be told, per PR.
+happens. Every PR still needs the other dev's recorded approval (§3.7), and an agent still waits
+to be told, per PR.
 
 ---
 
@@ -301,67 +309,31 @@ Then open a PR **into `main`**:
 
 ### 3.7 Review
 
-Every PR is in one of two lanes, decided by the files it touches. The `review-lane` check says
-which lane a PR is in, and what it is still missing. **It fails, but it does not block the merge**
-(#86): GitHub enforces no approval on `main`, so a human-lane PR may merge without one. The lanes
-are the process, and skipping the Approve there means the other dev has not seen a change that
-sets the rules, touches the production database, handles agent credentials or alters the deploy.
-
-| | **Fast lane** | **Human lane** |
-|---|---|---|
-| Which PRs | Everything not listed in [`.github/CODEOWNERS`](.github/CODEOWNERS): app code, UI, tests, docs | Any PR touching a path in `CODEOWNERS`: `AGENTS.md`, `.github/`, `scripts/protection.mjs`, `db/schema.sql`, `db/migrate.mjs`, MCP auth (`mcp/tokens.ts`, `mcp/endpoint.ts`, `app/api/mcp/`), `wrangler.jsonc`, `package.json`, `package-lock.json` |
-| Review | The review bot reviews every push. It **approves** when it finds nothing that should block the merge; otherwise it comments, the author's agent fixes or answers each point, and the next push is reviewed again | The bot comments once, never approves. **The other dev's Approve** on the head commit is what this lane asks for |
-| Merge | Every check green — nothing is *required* (#86), so this is yours to hold — then your human says go | The same |
-
-- **Why the split.** Most PRs are safe to ship on the bot's Approve, green checks and the author's
-  judgement, and waiting for a human there only slows both devs down. The human lane is the files
-  that set the rules, change the production database, handle agent credentials or change what
-  gets deployed. For those, the other dev has to know and agree before it ships, because `main`
-  deploys straight to production.
-- **The bot's Approve is for the commit it read.** It writes a verdict; the workflow approves that
-  exact commit, and only in the fast lane. A push starts a fresh review, so a fast-lane PR is
-  reviewed every time, while a human-lane PR is reviewed once and the other dev covers the pushes
-  after that. The bot cannot clear a human-lane PR even when it approves, because `review-lane`
-  counts an Approve only from a `CODEOWNERS` owner, and the bot is not one.
-- **When the bot is wrong or down.** If it keeps withholding its Approve over a point you disagree
-  with, or it cannot run (usage limits, lapsed token), answer its point on the PR and ask the other
-  dev for an Approve instead. Do not edit the bot to get past it: `.github/` is human-lane work.
-- **A human-lane Approve must say what was checked.** Write one line or more in the review body.
-  `review-lane` does not count an empty Approve, an Approve on an older commit, or the author's
-  own. Pushing again does **not** discard it — stale approvals are not dismissed on `main` (#86) —
-  so re-read the new commits yourself and re-approve if they still hold.
-- **"Request changes" is the one hard stop, in either lane.** While either dev's latest review
-  requests changes, `review-lane` fails. Reviews from accounts outside `CODEOWNERS` never count,
-  since the repo is public. It passes again once that reviewer approves or dismisses their review.
-  Use it for a real objection, and say what would resolve it. Nothing else stops you, so this is
-  the one a merge has to wait for.
-- **Changing the lanes is itself human-lane work.** `CODEOWNERS`, the ruleset spec and the checks
-  live under `.github/` and `scripts/protection.mjs`, so a PR that moves a path out of the human
-  lane is a PR to talk about first. GitHub reads `CODEOWNERS` from the base branch, and nothing
-  stops a PR from editing it, so the rule is kept by the two devs rather than by a check (#86).
-- **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. A finding posted as a plain PR comment is not a review at all: `protection.mjs lane` ignores it, so nobody can tell whether the PR is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
+- **Every PR needs one Approve from the other dev** — a GitHub review submitted with the state
+  **Approve**, on the head commit, before merge. There are no fast or human lanes: the size or the
+  files of a PR change how long the review takes, not whether it happens. The review bot's
+  comments are input for the author and the reviewer; they never stand in for the Approve.
+- **An Approve must say what was checked.** Write one line or more in the review body. An empty
+  Approve, the author's own, or one on an older commit does not count. Stale approvals are not
+  dismissed on push, so after new commits re-read them and re-approve if they still hold.
+- **"Request changes" is a hard stop.** Use it for a real objection, and say what would resolve it.
+- **Reviews are submitted as reviews,** with `gh pr review <number> --approve`, `--request-changes` or `--comment`, and a body. A finding posted as a plain PR comment leaves the PR with no review decision, so nobody can tell whether it is cleared. Put line-level fixes in ```` ```suggestion ```` blocks for the author to apply; do not push them yourself.
 - Reviewers: be specific, kind, and actionable. Distinguish **blocking** issues from `nit:` suggestions. Ask questions instead of assuming mistakes.
-- Authors: respond to every comment, the bot's included. Fix, or explain why not. Push fixes as new commits (don't rewrite history mid-review). In the human lane, re-request review when ready.
+- Authors: respond to every comment, the bot's included. Fix, or explain why not. Push fixes as new commits (don't rewrite history mid-review). Re-request review when ready.
 - Agents reviewing agents: check correctness, edge cases, tests, security, naming, and whether the PR actually satisfies the issue's acceptance criteria. Don't rubber-stamp.
 
 ### 3.8 Merge & close out
 
 - **Check before you merge, every time:**
   ```bash
-  gh pr view <number> --json statusCheckRollup,author,reviews,comments
-  node scripts/protection.mjs lane --pr <number>   # exit 1 = the human lane is still owed an Approve
+  gh pr view <number> --json reviewDecision,statusCheckRollup,author
   ```
-  Every check must be green, or you must say out loud why the red one does not matter. **Nothing is
-  a required check (#86), so this is a rule you hold, not one GitHub enforces** — a red `check` or
-  `applied` will not stop the merge going through, and that is exactly why refusing it is on you.
-  **GitHub's `reviewDecision` field is empty on this repo now (#86): it is only computed while
-  something *requires* reviews, and nothing does. Do not wait for `APPROVED` — it will not arrive,
-  and at the time of writing it reads `null` even on PRs that #84 merged with an Approve.** The
-  `lane` command above replaces it, and it is the only thing that reads the reviews at all. A
-  missing human-lane Approve is a conversation, not a wall (§0): get it, or say on the PR why this
-  one does not need it. `author` tells you whose PR it is, and §0.1 lets a dev merge their own.
-  Every review-bot point must be fixed or answered. Your human must also have told you to merge
-  *this* PR. If any of these fails, stop and say which one.
+  `reviewDecision` must be `APPROVED` by the other dev, every check must be green, and every
+  review-bot point must be fixed or answered. Until the owner's agent has applied the 1-approval
+  spec (§0), `reviewDecision` may read empty — then read `reviews` yourself and hold the merge
+  until the other dev's Approve is on the head commit. `author` tells you whose PR it is, and §0.1
+  lets a dev merge their own once approved. Your human must also have told you to merge *this* PR.
+  If any of these fails, stop and say which one.
 - Prefer **squash merge** so `main` history stays one commit per issue (title follows the PR title format).
 - Delete the branch after merge (the exception in rule 5).
 - Confirm the issue closed and its card moved to **Done** — `Closes #<number>` does the first,
@@ -437,7 +409,7 @@ A ticket is done only when:
 - [ ] Tests written/updated and passing; CI is green
 - [ ] Lint/format clean
 - [ ] Docs updated where relevant
-- [ ] Every review-bot point fixed or answered, and `node scripts/protection.mjs lane --pr <number>` exits 0 — no dev is requesting changes, and in the human lane the other dev has approved the head commit — or a stated reason that Approve was not needed (§0). `reviewDecision` is empty on this repo, so this line is the check, not that field
+- [ ] PR has a submitted **Approve** from the other dev on the head commit (`reviewDecision: APPROVED`), no one is requesting changes, and every review-bot point is fixed or answered
 - [ ] Merged to `main` via PR (squash), branch deleted
 - [ ] Issue is closed and its card is **Done**; follow-ups are filed
 
@@ -453,8 +425,8 @@ A ticket is done only when:
 5. Test + lint locally
 6. git push -u origin <branch>  →  open PR (template, "Closes #<number>")
 7. Comment the PR link on the issue (the board moves itself)
-8. Answer every bot point: fix it, or say why not
-9. Your human says go → squash merge, delete the branch → issue closed, card Done
+8. Answer every bot point; get the other dev's Approve
+9. Approved + green + your human says go → squash merge, delete the branch → issue closed, card Done
 ```
 
 **Never:** push to `main` · work without a ticket · write to a shared database or deploy without a go-ahead · claim "done" without evidence · commit secrets · force-push shared branches · sneak in unrelated changes · leave agent artifacts in the code.

@@ -151,15 +151,15 @@ export function SpaceRail({ spaces }: { spaces: Space[] }) {
           >
             <Link
               href={`/dashboard/${space.slug}`}
-              className={`font-primary flex h-60 w-52 origin-bottom flex-col justify-between rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
+              className={`flex h-60 w-52 origin-bottom flex-col justify-between rounded-xl p-4 shadow-[0_8px_24px_-12px_rgba(17,17,17,0.4)] transition-transform hover:z-20 hover:rotate-0 ${
                 TILES[index % TILES.length]
               } ${FAN[index % FAN.length]}`}
             >
-              <span aria-hidden className="text-5xl leading-none text-ink/20">
+              <span aria-hidden className="text-5xl font-bold leading-none text-ink/20">
                 {initial(space.name)}
               </span>
               <span>
-                <span className="block truncate text-base font-medium tracking-tight">
+                <span className="block truncate text-base font-semibold tracking-tight">
                   {space.name}
                 </span>
                 <span className="mt-1 block text-xs text-ink/60">

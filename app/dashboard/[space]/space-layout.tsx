@@ -97,7 +97,7 @@ const Cluster = ({ space }: { space: Shell }) => <Commands space={space} />;
 /** The space name, edited where it is read, with the action if it belongs here. */
 function Title({
   space,
-  size = "text-4xl tracking-[-0.02em]",
+  size = "font-display text-4xl font-medium tracking-[-0.02em]",
   className = "",
 }: {
   space: Shell;

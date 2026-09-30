@@ -46,7 +46,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-6 py-3.5 sm:px-8 lg:px-10">
           <Link
             href="/dashboard"
-            className="font-primary shrink-0 text-lg font-semibold tracking-tight"
+            className="font-display shrink-0 text-lg font-semibold tracking-tight"
           >
             CMSy
           </Link>

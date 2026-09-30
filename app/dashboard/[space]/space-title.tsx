@@ -55,7 +55,7 @@ export function SpaceTitle({
           event.currentTarget.blur();
         }
       }}
-      className={`font-primary w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 font-normal outline-none hover:border-line focus:border-line focus:bg-card ${className}`}
+      className={`w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 outline-none hover:border-line focus:border-line focus:bg-card ${className}`}
     />
   );
 }

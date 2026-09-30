@@ -7,6 +7,10 @@ import "./globals.css";
 const nohemi = localFont({
   src: "./fonts/Nohemi-VF.ttf",
   variable: "--font-nohemi",
+  // Nohemi-VF's `wght` axis spans 100–900. Without the range the generated
+  // @font-face defaults to 400 and a bold request is synthesized by the
+  // browser rather than interpolated from the axis, which looks smeared.
+  weight: "100 900",
   display: "swap",
 });
 

@@ -95,7 +95,7 @@ function Prose({ lines }: { lines: string[] }) {
       .filter(Boolean)
       .map((part, index) =>
         part.startsWith("**") ? (
-          <strong key={index} className="font-medium text-ink">
+          <strong key={index} className="font-semibold text-ink">
             {part.slice(2, -2)}
           </strong>
         ) : part.startsWith("`") ? (
@@ -162,7 +162,7 @@ function Spec({
   return (
     <section className="mt-5 border-t border-line pt-4 first:mt-0 first:border-t-0 first:pt-0">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="label">{label}</h3>
+        <h3 className="label font-semibold">{label}</h3>
         <span className="text-[11px] text-smoke">{count}</span>
       </div>
       <div className="mt-3">{children}</div>
@@ -182,7 +182,7 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
     <li className="flex items-center gap-4 border-b border-line py-2.5 last:border-0">
       <span
         aria-hidden
-        className="font-primary w-14 shrink-0 leading-none"
+        className="w-14 shrink-0 font-semibold leading-none"
         style={{ fontSize: `${size}rem` }}
       >
         Ag
@@ -264,7 +264,7 @@ async function DesignSystemSection({
           <div className="mt-4 space-y-5">
             {design.guidelines.map((section) => (
               <section key={section.title}>
-                <h4 className="font-primary text-base font-medium tracking-tight">
+                <h4 className="text-base font-semibold tracking-tight">
                   {section.title}
                 </h4>
                 <div className="mt-2">
@@ -339,7 +339,7 @@ function ComponentCard({ component }: { component: ComponentRow }) {
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-5">
-        <h3 className="font-primary truncate text-base font-medium tracking-tight">
+        <h3 className="truncate text-base font-semibold tracking-tight">
           {component.name}
         </h3>
 
@@ -403,7 +403,7 @@ async function DesignView({
   return (
     <div className="grid items-start gap-x-10 gap-y-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <div id="components" className="min-w-0 scroll-mt-6 lg:col-start-1 lg:row-start-1">
-        <h2 className="font-primary flex items-baseline gap-2 text-lg font-medium tracking-tight">
+        <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
           Components
           <span className="text-xs font-normal text-smoke">{components.length}</span>
         </h2>
@@ -415,7 +415,7 @@ async function DesignView({
       </div>
 
       <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-        <h2 className="font-primary text-lg font-medium tracking-tight">Design System</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Design System</h2>
         <p className="mt-1 text-xs text-smoke">
           From <code className="rounded bg-[#1111110a] px-1 py-0.5">DESIGN.md</code> — the rules
           every component here is built to.

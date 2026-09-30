@@ -21,8 +21,7 @@
   --color-mint: #b7efb2;
   --color-butter: #ffef99;
   --color-lilac: #e2ddfd;
-  --font-sans: var(--font-nohemi);
-  --font-mono: var(--font-nohemi);
+  --font-sans: var(--font-secondary);
 }
 
 body {
@@ -36,8 +35,11 @@ body {
   color: #111111;
 }
 
-/* Nohemi stays primary for display/headings/logo */
-.font-primary { font-family: var(--font-nohemi), Arial, sans-serif; }
+/* Nohemi is the display face and nothing else: hero statements and page
+   titles, always at 400 — the size carries it. Section and card headings are
+   Jakarta 600, UI labels and buttons Jakarta 500, body and meta Jakarta 400,
+   so the two faces read as a pairing instead of one wash. */
+.font-display { font-family: var(--font-nohemi), Arial, sans-serif; }
 
 /* Dashboard primitives — see DESIGN.md (surface cards, ink text, mint action) */
 .card {
@@ -157,22 +159,22 @@ body {
   letter-spacing: -1.76px;
 }
 
-/* The writing surface itself: one column, headings in Nohemi, body in Jakarta. */
+/* The writing surface itself: one column, the document title in Nohemi at 400
+   and everything below it in Jakarta — h1 keeps the display face, h2 and h3
+   are Jakarta 600 so they sit clearly above the 400 body. */
 .doc { margin-top: 1.5rem; min-height: 60vh; outline: none; line-height: 1.7; overflow-wrap: break-word; }
 .doc > * + * { margin-top: 0.75rem; }
 /* The Design tab's preview draws the same template the page canvas does, so it
    borrows the same type rules without the page's own layout. */
 .comp-preview { margin-top: 0; min-height: 0; }
 .doc h1, .doc h2, .doc h3 {
-  font-family: var(--font-nohemi), Arial, sans-serif;
-  font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.02em;
   margin-top: 1.75rem;
 }
-.doc h1 { font-size: 2rem; }
-.doc h2 { font-size: 1.5rem; }
-.doc h3 { font-size: 1.125rem; }
+.doc h1 { font-family: var(--font-nohemi), Arial, sans-serif; font-size: 2rem; font-weight: 400; }
+.doc h2 { font-size: 1.5rem; font-weight: 600; }
+.doc h3 { font-size: 1.125rem; font-weight: 600; }
 .doc ul { list-style: disc; padding-left: 1.5rem; }
 .doc ol { list-style: decimal; padding-left: 1.5rem; }
 .doc li { margin: 0.25rem 0; }

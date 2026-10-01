@@ -164,17 +164,24 @@ non-zero on the first failure.
 | --- | --- |
 | `list_spaces` | Lists every space — a CMSy project, owning its own pages, components and design system. Read-only. |
 | `list_pages` | Lists one space's pages (id, title, slug, created). Takes the space slug from `list_spaces`. Read-only. |
-| `get_page` | One page's document body as HTML, by space and page slug. Read-only. |
-| `set_page_blocks` | Replaces a page's whole body with HTML, by space and page slug. Refuses markup the editor would strip, so nothing is saved and then silently dropped. Destructive. |
+| `get_page` | One page's body as blocks (`{ version: 2, content: Block[] }`), by space and page slug. A body saved before blocks comes back converted. Read-only. |
+| `create_page` | Adds a page (`title`, optional body as `doc` or `html`) to a space. Returns the slug actually used, which gets a suffix if the title's slug is taken. A body the editor cannot keep is refused whole and no page is created. |
+| `set_page_blocks` | Replaces a page's whole body with blocks (`doc`), by space and page slug; `html` is still accepted and converted. Refuses a body the editor cannot keep, so nothing is saved and then silently dropped. Destructive. |
+| `rename_page` | Changes a page's title. The slug and body are untouched. |
+| `delete_page` | Deletes a page and its body. Destructive. |
 | `list_components` | Lists one space's components (name, description), and for an imported one, the component and space it came from. Takes the space slug. Read-only. |
 | `get_design_system` | Returns the design system a space uses, with its full `tokens`, and which space owns it when it is shared. Takes the space slug. Read-only. |
 | `list_design_systems` | Every design system, with its id, the space that owns it and its token count. Read-only. |
 | `use_design_system` | Points a space (`space` slug) at a design system (`designSystemId` from `list_design_systems`), its own or another space's. Refuses an id no system has. |
+| `set_design_system_tokens` | Replaces the `tokens` of the design system a space owns and uses. Refuses a set with an unknown group, a non-string value or a `{group.name}` reference to nothing; refuses a system the space only borrows. Every space using it changes. Destructive. |
 | `get_space` | One space by slug: name, page and component counts, design system name. Read-only. |
 | `list_importable` | Components in other spaces this space has not imported yet, with the space each lives in. Read-only. |
 | `list_recent_activity` | The newest pages and components across all spaces (`limit`, default 5, max 50). Read-only. |
 | `create_space` | Creates a space with its own design system. Returns the slug actually used, which gets a suffix if the name's slug is taken. |
-| `create_component` | Adds a component (`name`, optional `description`) to a space. |
+| `rename_space` | Changes a space's name. The slug is untouched, so links and tool calls keep working. |
+| `delete_space` | Deletes a space with every page, component and design system it owns; spaces borrowing its design system are left with none. Destructive. |
+| `create_component` | Adds a component (`name`, optional `description`, `props`, `template`) to a space. |
+| `update_component` | Sets a component's `props`, `template` or both, by name. Only what is sent is written — an omitted field is left as stored — and a template is checked against the props it will render with. |
 | `import_component` | Copies a component (`component` name in `fromSpace`) into a space, keeping a link to the original. |
 | `delete_component` | Deletes a component from a space by name. Destructive. |
 
@@ -182,6 +189,14 @@ The per-space tools take a slug, not an id, so an agent can chain them straight 
 `list_spaces`, and components are named rather than id'd because a name is unique within
 a space. An unknown slug, a missing component or a name that is already taken comes back
 as a tool error that says so, rather than an empty list or a silent no-op.
+
+`update_component` is the only partial write: every other write replaces what it names
+whole, so an agent reads first (`get_page`, `get_design_system`) and sends back the full
+value. Design tokens written over MCP do not show in the dashboard's Design view, which
+renders `DESIGN.md` (#48).
+
+There is deliberately no tool for issuing or revoking MCP tokens: an agent must not be
+able to mint its own credentials. That stays at `/dashboard/connect`.
 
 The write tools run the same functions in `db/index.ts` as the dashboard's server actions,
 with the same length limits, so the two cannot drift. Like the dashboard, they are only as

@@ -1,11 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { type ComponentRow, type DesignSystem } from "@/db";
-import {
-  componentProblems,
-  parseProps,
-  renderComponent,
-  type Prop,
-} from "@/db/component-template";
 import { useDesignSystem } from "../actions";
 import {
   cachedGetSpace,
@@ -13,6 +7,7 @@ import {
   cachedListDesignSystems,
   cachedListPagesInSpace,
 } from "../cached";
+import { ComponentCard } from "./component-card";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
 import { SpaceLayout, type View } from "./space-layout";
@@ -66,38 +61,6 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
           />
         ) : null
       }
-    />
-  );
-}
-/*
- * A component renders itself: the template it declares, filled with its own
- * fallbacks. Nothing here guesses from the name, which is the whole point — a
- * component with no template yet has nothing to show, and says so.
- */
-function ComponentPreview({ props, template }: { props: Prop[]; template: string }) {
-  const problems = componentProblems(props, template);
-  const html = renderComponent(props, template);
-
-  if (!html) {
-    return (
-      <p className="max-w-55 text-center text-xs leading-relaxed text-smoke">
-        {problems.length
-          ? problems[0]
-          : template
-            ? "This template declares no props, so it has nothing to draw."
-            : "No template yet. Declare its props and template below to see it here."}
-      </p>
-    );
-  }
-
-  // Safe by construction: renderComponent returns nothing unless the template
-  // passed the page allowlist, and it escapes every value it substitutes.
-  // `doc comp-preview` because this is the same markup a page canvas renders:
-  // the type rules come from `.doc`, the page's own layout from `.comp-preview`.
-  return (
-    <div
-      className="doc comp-preview w-full max-w-55"
-      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }
@@ -341,43 +304,6 @@ function DesignSystemSection({
 
 /* ---------------------------------------------------------------- components */
 
-/** A component shows itself: its own template, drawn over a faint dot grid. */
-function ComponentCard({ component }: { component: ComponentRow }) {
-  return (
-    <li className="flex flex-col overflow-hidden rounded-xl border border-line bg-card transition-shadow hover:shadow-[0_8px_24px_#1111110d]">
-      <div
-        className="flex min-h-44 items-center justify-center border-b border-line p-6"
-        style={{
-          backgroundColor: "#ffffff",
-          backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
-          backgroundSize: "14px 14px",
-        }}
-      >
-        <ComponentPreview props={parseProps(component.props)} template={component.template} />
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 p-5">
-        <h3 className="truncate text-base font-semibold tracking-tight">
-          {component.name}
-        </h3>
-
-        {component.description && (
-          <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
-        )}
-
-        <p className="mt-auto pt-1">
-          {component.origin_space_name ? (
-            <span className="badge">
-              Imported · {component.origin_name} from {component.origin_space_name}
-            </span>
-          ) : (
-            <span className="badge badge-quiet">Local</span>
-          )}
-        </p>
-      </div>
-    </li>
-  );
-}
 
 function ComponentsSection({ components }: { components: ComponentRow[] }) {
   if (components.length === 0) {

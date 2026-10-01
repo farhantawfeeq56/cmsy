@@ -128,7 +128,13 @@ async function guarded(request: Request): Promise<Response> {
   // The tool has run once its reply is complete, so read the reply out before
   // expiring the dashboard's cached reads. Expiring first would let a render in
   // between cache the row the write was about to change.
+  //
+  // Reading it whole assumes a write tool answers with one short reply, which
+  // every tool in `mcp/server.ts` does. A write tool that streams progress over
+  // SSE would arrive at the client in one piece, so it would need this changed.
   const body = await response.text();
+  // Not awaited, and safe on Workers: vinext hands the KV write behind
+  // `revalidateTag` to the request's `waitUntil`, so it outlives the response.
   revalidateTag(DASHBOARD_DATA, { expire: 0 });
   return new Response(body, response);
 }

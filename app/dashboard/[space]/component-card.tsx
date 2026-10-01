@@ -88,21 +88,24 @@ export function ComponentCard({ component }: { component: Component }) {
   useEffect(() => {
     if (!open) return;
 
-    // Move focus into the dialog and trap Tab there while it is open.
+    // Lock the page behind the overlay and put focus inside the dialog on the
+    // first focusable, so Tab and Shift+Tab both stay trapped from the first key.
     const dialog = dialogRef.current;
     const card = cardRef.current;
-    dialog?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const focusable = dialog?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+    );
+    (focusable?.[0] ?? dialog)?.focus();
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
         return;
       }
-      if (event.key !== "Tab" || !dialog) return;
-      const focusable = dialog.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
+      if (event.key !== "Tab" || !dialog || !focusable || focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (event.shiftKey && document.activeElement === first) {
@@ -117,6 +120,7 @@ export function ComponentCard({ component }: { component: Component }) {
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
       // Return focus to the card that opened the dialog.
       card?.focus();
     };

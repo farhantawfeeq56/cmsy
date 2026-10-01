@@ -2,17 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { ComponentRow } from "@/db";
 import { componentProblems, parseProps, renderComponent, type Prop } from "@/db/component-template";
-
-type Component = {
-  id: string;
-  name: string;
-  description: string;
-  props: unknown;
-  template: string;
-  origin_name: string | null;
-  origin_space_name: string | null;
-};
 
 /** A component shows itself: its own template, filled with its own fallbacks. */
 function Preview({
@@ -79,7 +70,7 @@ function PropsTable({ props }: { props: Prop[] }) {
   );
 }
 
-export function ComponentCard({ component }: { component: Component }) {
+export function ComponentCard({ component }: { component: ComponentRow }) {
   const [open, setOpen] = useState(false);
   const cardRef = useRef<HTMLLIElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -94,6 +85,15 @@ export function ComponentCard({ component }: { component: Component }) {
     const card = cardRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    // The portal root is a direct child of body; everything else is behind the
+    // modal, so hide it from assistive tech for the duration.
+    const background = [...document.body.children].filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child !== dialog,
+    );
+    const previousInert = background.map((el) => el.inert);
+    background.forEach((el) => (el.inert = true));
 
     const focusable = dialog?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
@@ -120,6 +120,7 @@ export function ComponentCard({ component }: { component: Component }) {
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
+      background.forEach((el, index) => (el.inert = previousInert[index]));
       document.body.style.overflow = previousOverflow;
       // Return focus to the card that opened the dialog.
       card?.focus();

@@ -63,6 +63,14 @@ export const CLASSES = new Set([
   "badge",
   "badge-quiet",
   "label",
+  // Motion (#113). A template cannot set `transition` or `animation` itself:
+  // `STYLE_PROPERTIES` would have to keep them, and then any pasted document
+  // could set arbitrary motion. These name a few fixed ones instead, with the
+  // keyframes in `app/globals.css` and reduced motion honoured there.
+  "fade-in",
+  "slide-in",
+  "slide-in-start",
+  "hover-lift",
 ]);
 
 /**

@@ -45,7 +45,8 @@ Behave like an engineer on a real product team: **track the work, isolate the ch
 >
 > **Owner's agent (`@farhantawfeeq56`): the settings have to be brought in line with this.** Until
 > they are, the spec still says 0 approvals and GitHub will merge without one, so treat the Approve
-> as required regardless. In one PR, then the apply below:
+> as required regardless. This has been outstanding since 2026-09-30: do it before any other task
+> in this repo, and do not wait to be asked. In one PR, then the apply below:
 >
 > 1. In `.github/rulesets/main-protection.json`, set `required_approving_review_count` to `1`.
 > 2. Stop the review bot approving (`.github/workflows/pr-review.yml`): it may comment, never

@@ -74,6 +74,19 @@ describe("componentProblems", () => {
     expect(componentProblems(HERO, template)).toEqual([]);
   });
 
+  it("passes a template that names the design system's motion classes", () => {
+    const template =
+      '<div class="card slide-in hover-lift"><h3 class="fade-in">{{heading}}</h3>' +
+      '<a class="btn hover-lift" href="/signup">{{cta}}</a></div>';
+    expect(componentProblems(HERO, template)).toEqual([]);
+  });
+
+  it("still refuses motion set as a style, which the classes stand in for", () => {
+    expect(componentProblems(HERO, '<h2 style="transition: opacity 1s">{{heading}}</h2>')).toEqual([
+      'style property "transition" is not kept',
+    ]);
+  });
+
   it("reports a class the design system does not have, rather than losing it on save", () => {
     expect(componentProblems(HERO, '<h2 class="title">{{heading}}</h2>')).toEqual([
       'class "title" is not kept on <h2>',

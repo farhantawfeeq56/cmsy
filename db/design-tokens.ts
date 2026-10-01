@@ -47,11 +47,16 @@ export function checkTokens(value: unknown): TokenCheck {
     return { tokens: {}, problems: ["tokens must be an object of groups"] };
   }
 
+  // Every string a reference could sit in, collected as the structure is
+  // checked. Only the shape below is ever visited — group, entry, property — so
+  // a deeply nested value is reported as the wrong type rather than walked.
+  const values: [path: string, value: string][] = [];
+
   const checkValue = (path: string, entry: unknown) => {
     if (typeof entry !== "string") problems.push(`${path} must be a string`);
     else if (entry.length > TOKEN_LIMITS.value) {
       problems.push(`${path} is ${entry.length} characters; a value holds ${TOKEN_LIMITS.value}`);
-    }
+    } else values.push([path, entry]);
   };
 
   const checkNames = (path: string, entries: Record<string, unknown>) => {
@@ -92,27 +97,25 @@ export function checkTokens(value: unknown): TokenCheck {
     }
   }
 
-  // References are checked last, against the set being written rather than
-  // the stored one, since this write replaces the stored one whole.
-  const walk = (path: string, entry: unknown) => {
-    if (typeof entry === "string") {
-      for (const [ref, group, name] of entry.matchAll(REFERENCE)) {
-        const target = (value as Record<string, unknown>)[group];
-        if (!isObject(target) || !(name in target)) {
-          problems.push(`${path} refers to ${ref}, which this set does not define`);
-        }
+  // Checked against the set being written rather than the stored one, since
+  // this write replaces the stored one whole. `hasOwn`, so `{colors.constructor}`
+  // is not taken for a token every object has.
+  for (const [path, entry] of values) {
+    for (const [ref, group, name] of entry.matchAll(REFERENCE)) {
+      const target = value[group];
+      if (!isObject(target) || !Object.hasOwn(target, name)) {
+        problems.push(`${path} refers to ${ref}, which this set does not define`);
       }
-    } else if (isObject(entry)) {
-      for (const [key, inner] of Object.entries(entry)) walk(`${path}.${key}`, inner);
     }
-  };
-  for (const [group, entries] of Object.entries(value)) {
-    if (TOKEN_GROUPS[group as TokenGroup] && isObject(entries)) walk(group, entries);
   }
 
-  const json = JSON.stringify(value);
-  if (json.length > TOKEN_LIMITS.json) {
-    problems.push(`those tokens are ${json.length} characters; a design system holds ${TOKEN_LIMITS.json}`);
+  // Only once the shape has passed, which bounds it at three levels deep:
+  // stringifying an arbitrarily nested value is what would overflow the stack.
+  if (!problems.length) {
+    const json = JSON.stringify(value);
+    if (json.length > TOKEN_LIMITS.json) {
+      problems.push(`those tokens are ${json.length} characters; a design system holds ${TOKEN_LIMITS.json}`);
+    }
   }
 
   return { tokens: value, problems };

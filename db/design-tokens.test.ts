@@ -54,3 +54,28 @@ describe("checkTokens", () => {
     expect(checkTokens({ colors: many }).problems).toContain(`colors has 101 entries; a group holds ${TOKEN_LIMITS.entries}`);
   });
 });
+
+describe("checkTokens on hostile input", () => {
+  it("reports a deeply nested value as the wrong type instead of walking it", () => {
+    let deep: unknown = "{colors.ink}";
+    for (let i = 0; i < 20_000; i++) deep = { a: deep };
+
+    expect(checkTokens({ colors: { primary: deep } }).problems).toEqual(["colors.primary must be a string"]);
+    expect(checkTokens({ typography: { h1: { fontSize: deep } } }).problems).toEqual([
+      "typography.h1.fontSize must be a string",
+    ]);
+  });
+
+  it("does not take an inherited property for a token", () => {
+    const { problems } = checkTokens({ colors: { primary: "{colors.constructor}" } });
+    expect(problems).toEqual(["colors.primary refers to {colors.constructor}, which this set does not define"]);
+  });
+
+  it("bounds the whole set", () => {
+    const groups = ["colors", "rounded", "spacing"].map((group) => [
+      group,
+      Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`t${i}`, "x".repeat(200)])),
+    ]);
+    expect(checkTokens(Object.fromEntries(groups)).problems[0]).toMatch(/a design system holds 50000/);
+  });
+});

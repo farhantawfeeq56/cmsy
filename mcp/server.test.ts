@@ -680,7 +680,7 @@ describe("delete_space", () => {
   it("says what went with it, including spaces left without a design system", async () => {
     vi.mocked(db.getSpace).mockResolvedValue({ ...DOCS, design_system_borrowers: 1 });
     vi.mocked(db.deleteSpace).mockResolvedValue(true);
-    const result = await call("delete_space", { space: "docs" });
+    const result = await call("delete_space", { space: "docs", confirmPageCount: 2 });
     expect(db.deleteSpace).toHaveBeenCalledWith("s-docs");
     expect(result.structuredContent).toEqual({
       name: "Docs",
@@ -693,8 +693,23 @@ describe("delete_space", () => {
   });
 
   it("is spaceNotFound for an unknown slug, with no write", async () => {
-    const result = await call("delete_space", { space: "nope" });
+    const result = await call("delete_space", { space: "nope", confirmPageCount: 0 });
     expect(result.isError).toBe(true);
+    expect(db.deleteSpace).not.toHaveBeenCalled();
+  });
+
+  it("deletes nothing when the page count does not match, and does not reveal it", async () => {
+    const result = await call("delete_space", { space: "docs", confirmPageCount: 3 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/confirmPageCount does not match Docs \(docs\), so nothing was deleted/);
+    expect(result.content[0].text).not.toMatch(/\b2\b/);
+    expect(db.deleteSpace).not.toHaveBeenCalled();
+  });
+
+  it("requires the count rather than treating it as optional", async () => {
+    const result = await call("delete_space", { space: "docs" });
+    expect(result.isError).toBe(true);
+    expect(db.getSpace).not.toHaveBeenCalled();
     expect(db.deleteSpace).not.toHaveBeenCalled();
   });
 });

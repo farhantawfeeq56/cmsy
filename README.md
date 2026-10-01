@@ -179,7 +179,7 @@ non-zero on the first failure.
 | `list_recent_activity` | The newest pages and components across all spaces (`limit`, default 5, max 50). Read-only. |
 | `create_space` | Creates a space with its own design system. Returns the slug actually used, which gets a suffix if the name's slug is taken. |
 | `rename_space` | Changes a space's name. The slug is untouched, so links and tool calls keep working. |
-| `delete_space` | Deletes a space with every page, component and design system it owns; spaces borrowing its design system are left with none. Destructive. |
+| `delete_space` | Deletes a space with every page, component and design system it owns; spaces borrowing its design system are left with none. Requires `confirmPageCount`, the page count `get_space` reports, so a stale or wrong slug deletes nothing. Destructive. |
 | `create_component` | Adds a component (`name`, optional `description`, `props`, `template`) to a space. |
 | `update_component` | Sets a component's `props`, `template` or both, by name. Only what is sent is written — an omitted field is left as stored — and a template is checked against the props it will render with. |
 | `import_component` | Copies a component (`component` name in `fromSpace`) into a space, keeping a link to the original. |

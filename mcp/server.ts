@@ -1383,14 +1383,33 @@ function registerDeleteSpace(server: McpServer) {
         "component, and the design system the space owns. This cannot be " +
         "undone. Other spaces that use this space's design system are left with " +
         "none, and components other spaces imported from it keep their copies " +
-        "but lose the link. Call get_space first to see what it holds.",
-      inputSchema: spaceInput,
+        "but lose the link. Call get_space first to see what it holds, and " +
+        "pass the page count it reports as confirmPageCount.",
+      inputSchema: spaceInput.extend({
+        confirmPageCount: z
+          .number()
+          .int()
+          .min(0)
+          .describe("The space's current page count, as get_space reports it. Nothing is deleted if it differs."),
+      }),
       outputSchema: deleteSpaceOutput,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     },
-    async ({ space: slug }) => {
+    async ({ space: slug, confirmPageCount }) => {
       const space = await getSpace(slug);
-      if (!space || !(await deleteSpace(space.id))) return spaceNotFound(slug);
+      if (!space) return spaceNotFound(slug);
+
+      // Something only a fresh read of this space would know, so a wrong or
+      // stale slug fails here instead of cascading. The real count is not
+      // echoed back: retrying with it would make the check a formality.
+      if (confirmPageCount !== space.page_count) {
+        return toolError(
+          `confirmPageCount does not match ${space.name} (${space.slug}), so nothing was deleted. ` +
+            "Call get_space, check this is the space you mean, and pass the page count it reports.",
+        );
+      }
+
+      if (!(await deleteSpace(space.id))) return spaceNotFound(slug);
 
       const borrowers = space.design_system_borrowers;
       return {

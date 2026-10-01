@@ -11,6 +11,7 @@ import {
   insertWithSlug,
   LIMITS,
   setPageDoc,
+  setSpaceDesignSystem,
   type SavePageResult,
   slugify,
   updateComponent as setComponent,
@@ -188,8 +189,6 @@ export async function useDesignSystem(formData: FormData) {
   const designSystemId = uuid(formData.get("designSystemId"));
   if (!spaceId || !designSystemId) return;
 
-  await db()`update spaces set design_system_id = ${designSystemId}
-    where id = ${spaceId}
-      and exists (select 1 from design_systems where id = ${designSystemId})`;
+  await setSpaceDesignSystem(spaceId, designSystemId);
   refresh();
 }

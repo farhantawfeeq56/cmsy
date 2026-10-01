@@ -14,11 +14,13 @@ import {
   importComponent,
   LIMITS,
   listComponents,
+  listDesignSystems,
   listImportable,
   listPages,
   listRecentActivity,
   listSpaces,
   setPageDoc,
+  setSpaceDesignSystem,
   updateComponent,
 } from "../db";
 // The leaf module, not `../db`: it is pure and import-free, so a test that
@@ -361,6 +363,121 @@ function registerGetDesignSystem(server: McpServer) {
           },
         ],
         structuredContent: structured,
+      };
+    },
+  );
+}
+
+const designSystemSummary = z.object({
+  id: z.string(),
+  name: z.string(),
+  ownedBy: spaceRef.nullable(),
+  tokenCount: z.number().int(),
+});
+
+const listDesignSystemsOutput = z.object({
+  count: z.number().int(),
+  designSystems: z.array(designSystemSummary),
+});
+
+function registerListDesignSystems(server: McpServer) {
+  server.registerTool(
+    "list_design_systems",
+    {
+      title: "List design systems",
+      description:
+        "List every design system, with the space that owns it and how many " +
+        "tokens it records. Every space starts with its own; pass an id from " +
+        "here to use_design_system to point a space at another space's.",
+      inputSchema: z.object({}),
+      outputSchema: listDesignSystemsOutput,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async () => {
+      const rows = await listDesignSystems();
+      const structured = {
+        count: rows.length,
+        designSystems: rows.map((d) => ({
+          id: d.id,
+          name: d.name,
+          ownedBy: d.space_slug ? { name: d.space_name ?? d.space_slug, slug: d.space_slug } : null,
+          tokenCount: d.token_count,
+        })),
+      };
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: structured.count
+              ? structured.designSystems
+                  .map(
+                    (d) =>
+                      `${d.name} (${d.id}) — ${d.tokenCount} tokens, ` +
+                      (d.ownedBy ? `owned by ${d.ownedBy.slug}` : "owned by no space"),
+                  )
+                  .join("\n")
+              : "No design systems yet.",
+          },
+        ],
+        structuredContent: structured,
+      };
+    },
+  );
+}
+
+const useDesignSystemOutput = z.object({
+  space: spaceRef,
+  designSystem: designSystemSummary,
+});
+
+function registerUseDesignSystem(server: McpServer) {
+  server.registerTool(
+    "use_design_system",
+    {
+      title: "Use design system",
+      description:
+        "Point a space at a design system — its own, or one another space owns. " +
+        "Take the id from list_design_systems. The space's previous system is " +
+        "not deleted, so pointing back undoes this. A shared system is shared, " +
+        "not copied: get_design_system will report the space that owns it.",
+      inputSchema: spaceInput.extend({
+        designSystemId: z.uuid().describe("The design system's id, as returned by list_design_systems."),
+      }),
+      outputSchema: useDesignSystemOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ space: slug, designSystemId }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const system = await getDesignSystem(designSystemId);
+      if (!system) {
+        return toolError(`No design system with id "${designSystemId}". Call list_design_systems to see them.`);
+      }
+
+      // The system can be deleted between the lookup and the write; the
+      // write checks again and reports that rather than claiming success.
+      if (!(await setSpaceDesignSystem(space.id, system.id))) {
+        return toolError(`${space.name} could not be pointed at "${system.name}"; it no longer exists.`);
+      }
+
+      const ownedBy = system.owner_space_slug
+        ? { name: system.owner_space_name ?? system.owner_space_slug, slug: system.owner_space_slug }
+        : null;
+      const origin = ownedBy && system.owner_space_id !== space.id ? `, shared from ${ownedBy.name}` : "";
+
+      return {
+        content: [{ type: "text" as const, text: `${space.name} now uses "${system.name}"${origin}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          designSystem: {
+            id: system.id,
+            name: system.name,
+            ownedBy,
+            tokenCount: countTokens(system.tokens),
+          },
+        },
       };
     },
   );
@@ -1013,6 +1130,8 @@ export function createCmsyMcpServer(): McpServer {
   registerSetPageBlocks(server);
   registerListComponents(server);
   registerGetDesignSystem(server);
+  registerListDesignSystems(server);
+  registerUseDesignSystem(server);
   registerGetSpace(server);
   registerCreateSpace(server);
   registerCreateComponent(server);

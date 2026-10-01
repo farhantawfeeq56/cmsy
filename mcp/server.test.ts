@@ -14,11 +14,13 @@ vi.mock("../db", () => ({
   getSpace: vi.fn(),
   importComponent: vi.fn(),
   listComponents: vi.fn(),
+  listDesignSystems: vi.fn(),
   listImportable: vi.fn(),
   listPages: vi.fn(),
   listRecentActivity: vi.fn(),
   listSpaces: vi.fn(),
   setPageDoc: vi.fn(),
+  setSpaceDesignSystem: vi.fn(),
   updateComponent: vi.fn(),
 }));
 
@@ -63,10 +65,10 @@ describe("tools/list", () => {
     };
     const hints = Object.fromEntries(tools.map((t) => [t.name, t.annotations]));
 
-    for (const read of ["get_space", "get_page", "list_importable", "list_recent_activity"]) {
+    for (const read of ["get_space", "get_page", "list_importable", "list_recent_activity", "list_design_systems"]) {
       expect(hints[read].readOnlyHint).toBe(true);
     }
-    for (const write of ["create_space", "create_component", "update_component", "import_component"]) {
+    for (const write of ["create_space", "create_component", "update_component", "import_component", "use_design_system"]) {
       expect(hints[write]).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
     for (const destructive of ["delete_component", "set_page_blocks"]) {
@@ -324,6 +326,81 @@ beforeEach(async () => {
   vi.mocked(db.setPageDoc).mockImplementation(async (_id, value) => {
     const { problems } = checkPageDoc(value);
     return problems.length ? { saved: false, problems } : { saved: true };
+  });
+});
+
+const SITE_SYSTEM = {
+  id: "3f1c2a9e-8b7d-4c6e-9a5f-1e2d3c4b5a69",
+  name: "Marketing site design system",
+  tokens: { colors: { primary: "#000", ink: "#111" }, rounded: { md: "8px" } },
+  owner_space_id: "s-site",
+  owner_space_name: "Marketing site",
+  owner_space_slug: "marketing-site",
+};
+
+describe("list_design_systems", () => {
+  it("names the space that owns each system, and none for an orphan", async () => {
+    vi.mocked(db.listDesignSystems).mockResolvedValue([
+      { id: SITE_SYSTEM.id, name: SITE_SYSTEM.name, space_id: "s-site", space_name: "Marketing site", space_slug: "marketing-site", token_count: 3 },
+      { id: "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a", name: "Orphan", space_id: null, space_name: null, space_slug: null, token_count: 0 },
+    ]);
+    const result = await call("list_design_systems", {});
+    expect(result.structuredContent).toEqual({
+      count: 2,
+      designSystems: [
+        { id: SITE_SYSTEM.id, name: SITE_SYSTEM.name, ownedBy: { name: "Marketing site", slug: "marketing-site" }, tokenCount: 3 },
+        { id: "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a", name: "Orphan", ownedBy: null, tokenCount: 0 },
+      ],
+    });
+  });
+});
+
+describe("use_design_system", () => {
+  it("points the space at another space's system and says whose it is", async () => {
+    vi.mocked(db.getDesignSystem).mockResolvedValue(SITE_SYSTEM);
+    vi.mocked(db.setSpaceDesignSystem).mockResolvedValue(true);
+    const result = await call("use_design_system", { space: "docs", designSystemId: SITE_SYSTEM.id });
+
+    expect(db.setSpaceDesignSystem).toHaveBeenCalledWith("s-docs", SITE_SYSTEM.id);
+    expect(result.content[0].text).toBe('Docs now uses "Marketing site design system", shared from Marketing site.');
+    expect(result.structuredContent).toEqual({
+      space: { name: "Docs", slug: "docs" },
+      designSystem: {
+        id: SITE_SYSTEM.id,
+        name: SITE_SYSTEM.name,
+        ownedBy: { name: "Marketing site", slug: "marketing-site" },
+        tokenCount: 3,
+      },
+    });
+  });
+
+  it("refuses a system no row owns, with no write", async () => {
+    vi.mocked(db.getDesignSystem).mockResolvedValue(null);
+    const result = await call("use_design_system", { space: "docs", designSystemId: SITE_SYSTEM.id });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/No design system with id/);
+    expect(db.setSpaceDesignSystem).not.toHaveBeenCalled();
+  });
+
+  it("is a tool error for an unknown space, with no lookup", async () => {
+    const result = await call("use_design_system", { space: "nope", designSystemId: SITE_SYSTEM.id });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/No space with slug "nope"/);
+    expect(db.getDesignSystem).not.toHaveBeenCalled();
+  });
+
+  it("rejects an id that is not a uuid before touching the database", async () => {
+    const result = await call("use_design_system", { space: "docs", designSystemId: "marketing-site" });
+    expect(result.isError).toBe(true);
+    expect(db.getSpace).not.toHaveBeenCalled();
+  });
+
+  it("reports a system deleted between the lookup and the write", async () => {
+    vi.mocked(db.getDesignSystem).mockResolvedValue(SITE_SYSTEM);
+    vi.mocked(db.setSpaceDesignSystem).mockResolvedValue(false);
+    const result = await call("use_design_system", { space: "docs", designSystemId: SITE_SYSTEM.id });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/no longer exists/);
   });
 });
 

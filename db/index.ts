@@ -2,6 +2,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "../app/dashboard/[space]/design.generated.json";
 import type { Prop } from "./component-template";
+import { checkTokens } from "./design-tokens";
 import { checkPageDoc, readPageDoc, type PageDoc } from "./page-doc";
 
 type Client = NeonQueryFunction<false, false>;
@@ -228,6 +229,18 @@ export const pageDoc = (blocks: unknown): PageDoc => readPageDoc(blocks);
 
 export type SavePageResult = { saved: true } | { saved: false; problems: string[] };
 
+/** A body as the JSON to store, or every reason it cannot be stored. */
+function checkBody(value: unknown): { json: string } | { problems: string[] } {
+  const { doc, problems } = checkPageDoc(value);
+  if (problems.length) return { problems };
+
+  const json = JSON.stringify(doc);
+  if (json.length > LIMITS.pageBody) {
+    return { problems: [`that body is ${json.length} characters; a page holds ${LIMITS.pageBody}`] };
+  }
+  return { json };
+}
+
 /**
  * Replaces a page's body. Both writers — the editor's autosave and the
  * `set_page_blocks` MCP tool — come through here, so the check runs once and
@@ -236,16 +249,9 @@ export type SavePageResult = { saved: true } | { saved: false; problems: string[
  * quietly loses the rest.
  */
 export async function setPageDoc(id: string, value: unknown): Promise<SavePageResult> {
-  const { doc, problems } = checkPageDoc(value);
-  if (problems.length) return { saved: false, problems };
-
-  const json = JSON.stringify(doc);
-  if (json.length > LIMITS.pageBody) {
-    return {
-      saved: false,
-      problems: [`that body is ${json.length} characters; a page holds ${LIMITS.pageBody}`],
-    };
-  }
+  const body = checkBody(value);
+  if ("problems" in body) return { saved: false, problems: body.problems };
+  const { json } = body;
 
   const found = await rows<{ id: string }>(db()`
     update pages
@@ -301,6 +307,7 @@ export const listImportable = (spaceId: string) =>
  */
 export const LIMITS = {
   spaceName: 80,
+  pageTitle: 120,
   componentName: 80,
   componentDescription: 300,
   /** ~200KB of stored JSON is already a very long page; the cap bounds a hostile save. */
@@ -350,6 +357,75 @@ export async function createSpace(name: string) {
     returning id`);
   await db()`update spaces set design_system_id = ${designSystem.id} where id = ${row.id}`;
   return row;
+}
+
+/**
+ * Renames a space. The slug is deliberately left alone, so a rename never
+ * breaks a link that is already out there. False when no such space exists.
+ */
+export async function renameSpace(id: string, name: string) {
+  const found = await rows<{ id: string }>(db()`
+    update spaces set name = ${name} where id = ${id} returning id`);
+  return found.length > 0;
+}
+
+/**
+ * Removes a space and everything in it. `pages`, `components` and the space's
+ * own design systems cascade in the schema, so one delete is the whole job.
+ * Other spaces that used one of its design systems are left with none, and
+ * components copied out of it lose their link to their original. False when no
+ * such space exists.
+ */
+export async function deleteSpace(id: string) {
+  const deleted = await rows<{ id: string }>(db()`
+    delete from spaces where id = ${id} returning id`);
+  return deleted.length > 0;
+}
+
+export type CreatePageResult =
+  | { saved: true; id: string; slug: string }
+  | { saved: false; problems: string[] };
+
+/**
+ * A new page, with its slug derived from the title and deduped within the
+ * space. A body is optional, and checked the way `setPageDoc` checks one before
+ * anything is inserted, so a body with a problem leaves no page behind. With no
+ * body the page starts empty, as the column default has it. Null when no slug
+ * is free.
+ */
+export async function createPage(
+  spaceId: string,
+  title: string,
+  body?: unknown,
+): Promise<CreatePageResult | null> {
+  let json = "[]";
+  if (body !== undefined) {
+    const checked = checkBody(body);
+    if ("problems" in checked) return { saved: false, problems: checked.problems };
+    json = checked.json;
+  }
+
+  const row = await insertWithSlug(
+    (slug) => db()`insert into pages (space_id, title, slug, blocks)
+      values (${spaceId}, ${title}, ${slug}, ${json}::jsonb)
+      on conflict (space_id, slug) do nothing returning id`,
+    slugify(title),
+  );
+  return row && { saved: true, ...row };
+}
+
+/** The slug stays put, like a space's. False when no such page exists. */
+export async function renamePage(id: string, title: string) {
+  const found = await rows<{ id: string }>(db()`
+    update pages set title = ${title} where id = ${id} returning id`);
+  return found.length > 0;
+}
+
+/** False when no such page exists in that space. */
+export async function deletePage(spaceId: string, id: string) {
+  const deleted = await rows<{ id: string }>(db()`
+    delete from pages where id = ${id} and space_id = ${spaceId} returning id`);
+  return deleted.length > 0;
 }
 
 /** Null when the space already has a component with that name. */
@@ -489,6 +565,27 @@ export async function getDesignSystem(id: string): Promise<DesignSystemTokens | 
     where d.id = ${id}
   `);
   return row ?? null;
+}
+
+/**
+ * Replaces a design system's tokens whole. `design-tokens` owns the shape, and
+ * a set with any problem is refused rather than trimmed, as a page body is.
+ * Every space that uses this system sees the change.
+ */
+export async function setDesignSystemTokens(
+  id: string,
+  value: unknown,
+): Promise<{ saved: true } | { saved: false; problems: string[] }> {
+  const { tokens, problems } = checkTokens(value);
+  if (problems.length) return { saved: false, problems };
+
+  const found = await rows<{ id: string }>(db()`
+    update design_systems
+    set tokens = ${JSON.stringify(tokens)}::jsonb
+    where id = ${id}
+    returning id
+  `);
+  return found.length > 0 ? { saved: true } : { saved: false, problems: ["that design system does not exist"] };
 }
 
 export type McpToken = {

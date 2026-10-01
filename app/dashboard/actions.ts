@@ -4,16 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createComponent as insertComponent,
+  createPage as insertPage,
   createSpace as insertSpace,
-  db,
   deleteComponent as removeComponent,
+  deletePage as removePage,
+  deleteSpace as removeSpace,
   importComponent as copyComponent,
-  insertWithSlug,
   LIMITS,
+  renamePage as setPageTitle,
+  renameSpace as setSpaceName,
   setPageDoc,
   setSpaceDesignSystem,
   type SavePageResult,
-  slugify,
   updateComponent as setComponent,
 } from "@/db";
 import { parseProps, parseTemplate, type Prop } from "@/db/component-template";
@@ -64,14 +66,10 @@ export async function createSpace(formData: FormData) {
 
 export async function createPage(formData: FormData) {
   const spaceId = uuid(formData.get("spaceId"));
-  const title = text(formData.get("title"), 120);
+  const title = text(formData.get("title"), LIMITS.pageTitle);
   if (!spaceId || !title) return;
 
-  await insertWithSlug(
-    (slug) => db()`insert into pages (space_id, title, slug) values (${spaceId}, ${title}, ${slug})
-      on conflict (space_id, slug) do nothing returning id`,
-    slugify(title),
-  );
+  await insertPage(spaceId, title);
   refresh();
 }
 
@@ -91,10 +89,10 @@ export async function savePageBlocks(id: string, doc: unknown): Promise<SavePage
 /** Titles are edited in place, so this is submitted on blur and on Enter. */
 export async function renamePage(formData: FormData) {
   const id = uuid(formData.get("id"));
-  const title = text(formData.get("title"), 120);
+  const title = text(formData.get("title"), LIMITS.pageTitle);
   if (!id || !title) return;
 
-  await db()`update pages set title = ${title} where id = ${id}`;
+  await setPageTitle(id, title);
   refresh();
 }
 
@@ -108,21 +106,19 @@ export async function renameSpace(formData: FormData) {
   const name = text(formData.get("name"), LIMITS.spaceName);
   if (!id || !name) return;
 
-  await db()`update spaces set name = ${name} where id = ${id}`;
+  await setSpaceName(id, name);
   refresh();
 }
 
 /**
- * Removes a space and everything in it. `pages`, `components` and the space's
- * own design systems cascade in the schema, so one delete is the whole job —
- * there is nothing to sweep up here. It lands on the dashboard, because the
- * page you were on no longer exists.
+ * Removes a space and everything in it; `deleteSpace` in `db` says what goes.
+ * It lands on the dashboard, because the page you were on no longer exists.
  */
 export async function deleteSpace(formData: FormData) {
   const id = uuid(formData.get("id"));
   if (!id) return;
 
-  await db()`delete from spaces where id = ${id}`;
+  await removeSpace(id);
   refresh();
   redirect("/dashboard");
 }
@@ -132,7 +128,7 @@ export async function deletePage(formData: FormData) {
   const spaceId = uuid(formData.get("spaceId"));
   if (!id || !spaceId) return;
 
-  await db()`delete from pages where id = ${id} and space_id = ${spaceId}`;
+  await removePage(spaceId, id);
   refresh();
 }
 

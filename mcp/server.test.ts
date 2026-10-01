@@ -4,10 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Every database function the tools call is replaced, so these tests exercise
 // the real tool schemas, annotations and error handling with no database.
 vi.mock("../db", () => ({
-  LIMITS: { spaceName: 80, componentName: 80, componentDescription: 300, pageBody: 200_000 },
+  LIMITS: { spaceName: 80, pageTitle: 120, componentName: 80, componentDescription: 300, pageBody: 200_000 },
   createComponent: vi.fn(),
+  createPage: vi.fn(),
   createSpace: vi.fn(),
   deleteComponent: vi.fn(),
+  deletePage: vi.fn(),
+  deleteSpace: vi.fn(),
   findComponent: vi.fn(),
   getDesignSystem: vi.fn(),
   getPage: vi.fn(),
@@ -19,6 +22,9 @@ vi.mock("../db", () => ({
   listPages: vi.fn(),
   listRecentActivity: vi.fn(),
   listSpaces: vi.fn(),
+  renamePage: vi.fn(),
+  renameSpace: vi.fn(),
+  setDesignSystemTokens: vi.fn(),
   setPageDoc: vi.fn(),
   setSpaceDesignSystem: vi.fn(),
   updateComponent: vi.fn(),
@@ -68,10 +74,25 @@ describe("tools/list", () => {
     for (const read of ["get_space", "get_page", "list_importable", "list_recent_activity", "list_design_systems"]) {
       expect(hints[read].readOnlyHint).toBe(true);
     }
-    for (const write of ["create_space", "create_component", "update_component", "import_component", "use_design_system"]) {
+    for (const write of [
+      "create_space",
+      "rename_space",
+      "create_page",
+      "rename_page",
+      "create_component",
+      "update_component",
+      "import_component",
+      "use_design_system",
+    ]) {
       expect(hints[write]).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
-    for (const destructive of ["delete_component", "set_page_blocks"]) {
+    for (const destructive of [
+      "delete_component",
+      "set_page_blocks",
+      "delete_page",
+      "delete_space",
+      "set_design_system_tokens",
+    ]) {
       expect(hints[destructive]).toMatchObject({ readOnlyHint: false, destructiveHint: true });
     }
   });
@@ -524,3 +545,237 @@ describe("set_page_blocks", () => {
   });
 });
 
+describe("create_page", () => {
+  // The insert is replaced, but the body is judged by the real rules, as
+  // `createPage` judges it, so a refusal here is one the database would make.
+  beforeEach(async () => {
+    const { checkPageDoc } = await import("../db/page-doc");
+    vi.mocked(db.createPage).mockImplementation(async (_space, title, body) => {
+      if (body !== undefined) {
+        const { problems } = checkPageDoc(body);
+        if (problems.length) return { saved: false, problems };
+      }
+      return { saved: true, id: "p-new", slug: title === "Pricing" ? "pricing-2" : "page" };
+    });
+  });
+
+  it("returns the slug that was actually used, suffix included", async () => {
+    const result = await call("create_page", { space: "docs", title: "Pricing" });
+    expect(db.createPage).toHaveBeenCalledWith("s-docs", "Pricing", undefined);
+    expect(result.structuredContent).toEqual({
+      space: { name: "Docs", slug: "docs" },
+      page: { id: "p-new", title: "Pricing", slug: "pricing-2" },
+      blocks: 0,
+      dashboardPath: "/dashboard/docs/pages/pricing-2",
+    });
+  });
+
+  it("creates the page with the body it was given, as blocks or as html", async () => {
+    const doc = DOC({ type: "Text", props: { id: "t1", text: "<p>Hi</p>" } });
+    const result = await call("create_page", { space: "docs", title: "Pricing", doc });
+    expect(db.createPage).toHaveBeenCalledWith("s-docs", "Pricing", doc);
+    expect(result.structuredContent).toMatchObject({ blocks: 1 });
+
+    await call("create_page", { space: "docs", title: "Pricing", html: "<p>Hi</p>" });
+    expect(db.createPage).toHaveBeenLastCalledWith(
+      "s-docs",
+      "Pricing",
+      DOC({ type: "Text", props: { id: "legacy-text-0", text: "<p>Hi</p>" } }),
+    );
+  });
+
+  it("refuses a body the editor cannot keep in set_page_blocks' words, creating nothing", async () => {
+    const result = await call("create_page", {
+      space: "docs",
+      title: "Pricing",
+      doc: DOC({ type: "Iframe", props: { id: "x1" } }),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/^The editor cannot keep all of that, so nothing was saved:/);
+    expect(result.content[0].text).toContain('"Iframe" is not a block type');
+    expect(result.structuredContent).toBeUndefined();
+  });
+
+  it("refuses both doc and html before touching the database", async () => {
+    const result = await call("create_page", { space: "docs", title: "Pricing", doc: DOC(), html: "<p>x</p>" });
+    expect(result.isError).toBe(true);
+    expect(db.getSpace).not.toHaveBeenCalled();
+  });
+
+  it("is a tool error for an unknown space or a blank title, with no write", async () => {
+    expect((await call("create_page", { space: "nope", title: "Pricing" })).isError).toBe(true);
+    expect((await call("create_page", { space: "docs", title: "  " })).isError).toBe(true);
+    expect(db.createPage).not.toHaveBeenCalled();
+  });
+
+  it("says so when no slug is free", async () => {
+    vi.mocked(db.createPage).mockResolvedValue(null);
+    const result = await call("create_page", { space: "docs", title: "Pricing" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/free slug/);
+  });
+});
+
+describe("rename_page", () => {
+  it("renames by the id the slug resolves to and keeps the slug", async () => {
+    vi.mocked(db.getPage).mockResolvedValue(PRICING);
+    vi.mocked(db.renamePage).mockResolvedValue(true);
+    const result = await call("rename_page", { space: "docs", page: "pricing", title: "Plans" });
+    expect(db.renamePage).toHaveBeenCalledWith("p1", "Plans");
+    expect(result.structuredContent).toEqual({
+      space: { name: "Docs", slug: "docs" },
+      page: { id: "p1", title: "Plans", slug: "pricing" },
+      previousTitle: "Pricing",
+    });
+  });
+
+  it("is pageNotFound for an unknown page, with no write", async () => {
+    vi.mocked(db.getPage).mockResolvedValue(null);
+    const result = await call("rename_page", { space: "docs", page: "nope", title: "Plans" });
+    expect(result.content[0].text).toBe('No page with slug "nope" in Docs. Call list_pages to see the slugs that exist.');
+    expect(db.renamePage).not.toHaveBeenCalled();
+  });
+});
+
+describe("delete_page", () => {
+  it("deletes by the id the slug resolves to, scoped to the space", async () => {
+    vi.mocked(db.getPage).mockResolvedValue(PRICING);
+    vi.mocked(db.deletePage).mockResolvedValue(true);
+    const result = await call("delete_page", { space: "docs", page: "pricing" });
+    expect(db.deletePage).toHaveBeenCalledWith("s-docs", "p1");
+    expect(result.content[0].text).toBe("Deleted Pricing (pricing) from Docs.");
+  });
+
+  it("reports a page that went away before the delete rather than claiming it", async () => {
+    vi.mocked(db.getPage).mockResolvedValue(PRICING);
+    vi.mocked(db.deletePage).mockResolvedValue(false);
+    const result = await call("delete_page", { space: "docs", page: "pricing" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/No page with slug "pricing" in Docs/);
+  });
+
+  it("does not look for a page in a space that does not exist", async () => {
+    const result = await call("delete_page", { space: "ghost", page: "pricing" });
+    expect(result.isError).toBe(true);
+    expect(db.getPage).not.toHaveBeenCalled();
+  });
+});
+
+describe("rename_space", () => {
+  it("renames the space and reports the slug unchanged", async () => {
+    vi.mocked(db.renameSpace).mockResolvedValue(true);
+    const result = await call("rename_space", { space: "docs", name: "Handbook" });
+    expect(db.renameSpace).toHaveBeenCalledWith("s-docs", "Handbook");
+    expect(result.structuredContent).toEqual({ name: "Handbook", slug: "docs", previousName: "Docs" });
+  });
+
+  it("is spaceNotFound for an unknown slug, with no write", async () => {
+    const result = await call("rename_space", { space: "nope", name: "Handbook" });
+    expect(result.content[0].text).toBe('No space with slug "nope". Call list_spaces to see the slugs that exist.');
+    expect(db.renameSpace).not.toHaveBeenCalled();
+  });
+});
+
+describe("delete_space", () => {
+  it("says what went with it, including spaces left without a design system", async () => {
+    vi.mocked(db.getSpace).mockResolvedValue({ ...DOCS, design_system_borrowers: 1 });
+    vi.mocked(db.deleteSpace).mockResolvedValue(true);
+    const result = await call("delete_space", { space: "docs", confirmPageCount: 2 });
+    expect(db.deleteSpace).toHaveBeenCalledWith("s-docs");
+    expect(result.structuredContent).toEqual({
+      name: "Docs",
+      slug: "docs",
+      deletedPages: 2,
+      deletedComponents: 2,
+      spacesLeftWithoutDesignSystem: 1,
+    });
+    expect(result.content[0].text).toMatch(/1 other space\(s\) used its design system and now have none/);
+  });
+
+  it("is spaceNotFound for an unknown slug, with no write", async () => {
+    const result = await call("delete_space", { space: "nope", confirmPageCount: 0 });
+    expect(result.isError).toBe(true);
+    expect(db.deleteSpace).not.toHaveBeenCalled();
+  });
+
+  it("deletes nothing when the page count does not match, and does not reveal it", async () => {
+    const result = await call("delete_space", { space: "docs", confirmPageCount: 3 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/confirmPageCount does not match Docs \(docs\), so nothing was deleted/);
+    expect(result.content[0].text).not.toMatch(/\b2\b/);
+    expect(db.deleteSpace).not.toHaveBeenCalled();
+  });
+
+  it("requires the count rather than treating it as optional", async () => {
+    const result = await call("delete_space", { space: "docs" });
+    expect(result.isError).toBe(true);
+    expect(db.getSpace).not.toHaveBeenCalled();
+    expect(db.deleteSpace).not.toHaveBeenCalled();
+  });
+});
+
+describe("set_design_system_tokens", () => {
+  const SITE_OWN = { ...SITE, design_system_id: SITE_SYSTEM.id, design_system_borrowers: 1 };
+  const DOCS_BORROWING = { ...DOCS, design_system_id: SITE_SYSTEM.id };
+  const TOKENS = { colors: { primary: "#222" }, components: { card: { backgroundColor: "{colors.primary}" } } };
+
+  // The write is replaced, but the set is judged by the real checker.
+  beforeEach(async () => {
+    const { checkTokens } = await import("../db/design-tokens");
+    vi.mocked(db.setDesignSystemTokens).mockImplementation(async (_id, value) => {
+      const { problems } = checkTokens(value);
+      return problems.length ? { saved: false, problems } : { saved: true };
+    });
+    vi.mocked(db.getDesignSystem).mockResolvedValue(SITE_SYSTEM);
+    vi.mocked(db.getSpace).mockImplementation(async (slug) =>
+      slug === "marketing-site" ? SITE_OWN : slug === "docs" ? DOCS_BORROWING : null,
+    );
+  });
+
+  it("replaces the tokens of the system the space owns, and says who else changed", async () => {
+    const result = await call("set_design_system_tokens", { space: "marketing-site", tokens: TOKENS });
+    expect(db.setDesignSystemTokens).toHaveBeenCalledWith(SITE_SYSTEM.id, TOKENS);
+    expect(result.content[0].text).toBe(
+      'Saved 2 tokens to "Marketing site design system". 1 other space(s) use it and changed too.',
+    );
+    expect(result.structuredContent).toEqual({
+      space: { name: "Marketing site", slug: "marketing-site" },
+      designSystem: { id: SITE_SYSTEM.id, name: SITE_SYSTEM.name, tokenCount: 2 },
+      alsoUsedBy: 1,
+    });
+  });
+
+  it("refuses a set with problems whole, listing every one", async () => {
+    const result = await call("set_design_system_tokens", {
+      space: "marketing-site",
+      tokens: { shadows: {}, components: { card: { textColor: "{colors.ink}" } } },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/^Nothing was saved:/);
+    expect(result.content[0].text).toContain('"shadows" is not a token group');
+    expect(result.content[0].text).toContain("refers to {colors.ink}");
+  });
+
+  it("will not edit another space's system from a space that only uses it", async () => {
+    const result = await call("set_design_system_tokens", { space: "docs", tokens: TOKENS });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Call this with space "marketing-site"/);
+    expect(db.setDesignSystemTokens).not.toHaveBeenCalled();
+  });
+
+  it("is a tool error for a space with no design system, or no space", async () => {
+    vi.mocked(db.getSpace).mockImplementation(async (slug) => (slug === "docs" ? DOCS : null));
+    expect((await call("set_design_system_tokens", { space: "docs", tokens: TOKENS })).content[0].text).toMatch(
+      /no design system selected/,
+    );
+    expect((await call("set_design_system_tokens", { space: "nope", tokens: TOKENS })).isError).toBe(true);
+    expect(db.setDesignSystemTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe("credentials", () => {
+  it("offers no tool that mints or revokes MCP tokens", async () => {
+    const { tools } = (await rpc("tools/list", {})).result as { tools: { name: string }[] };
+    expect(tools.map((t) => t.name).filter((name) => /mcp|credential|auth/i.test(name))).toEqual([]);
+  });
+});

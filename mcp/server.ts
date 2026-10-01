@@ -5,8 +5,11 @@ import { z } from "zod";
 // that Next's bundler resolves is not available.
 import {
   createComponent,
+  createPage,
   createSpace,
   deleteComponent,
+  deletePage,
+  deleteSpace,
   findComponent,
   getDesignSystem,
   getPage,
@@ -19,6 +22,9 @@ import {
   listPages,
   listRecentActivity,
   listSpaces,
+  renamePage,
+  renameSpace,
+  setDesignSystemTokens,
   setPageDoc,
   setSpaceDesignSystem,
   updateComponent,
@@ -28,6 +34,7 @@ import {
 import { CLASSES } from "../db/page-html";
 // Pure as well, so the tests read and count bodies with the real rules.
 import { checkPageDoc, DOC_LIMITS, fromLegacyHtml, readPageDoc, type Block } from "../db/page-doc";
+import { TOKEN_GROUPS } from "../db/design-tokens";
 // Also import-free, so a template is judged by the same rules the editor
 // enforces rather than by a second copy of them.
 import {
@@ -173,7 +180,7 @@ function registerListPages(server: McpServer) {
       title: "List pages",
       description:
         "List the pages in one space, oldest first: id, title, slug and when " +
-        "each was created. Page content is not included — nothing stores it yet.",
+        "each was created. Bodies are not included; read one with get_page.",
       inputSchema: spaceInput,
       outputSchema: listPagesOutput,
       annotations: { readOnlyHint: true, idempotentHint: true },
@@ -477,6 +484,77 @@ function registerUseDesignSystem(server: McpServer) {
             ownedBy,
             tokenCount: countTokens(system.tokens),
           },
+        },
+      };
+    },
+  );
+}
+
+const setDesignSystemTokensOutput = z.object({
+  space: spaceRef,
+  designSystem: z.object({ id: z.string(), name: z.string(), tokenCount: z.number().int() }),
+  alsoUsedBy: z.number().int(),
+});
+
+function registerSetDesignSystemTokens(server: McpServer) {
+  server.registerTool(
+    "set_design_system_tokens",
+    {
+      title: "Set design system tokens",
+      description:
+        "Replace the tokens of the design system a space owns and uses. This " +
+        "replaces rather than merges, so read them with get_design_system first " +
+        "and send back the full set. Tokens are grouped: colors, rounded and " +
+        "spacing map a name to a string value; typography and components map a " +
+        "name to an object of string properties. A value may refer to another " +
+        "token as {group.name}, and must refer to one this set defines. A set " +
+        "with any problem is refused whole, with the reasons. Every space that " +
+        "uses this system changes with it. A space using another space's system " +
+        "cannot edit it from here — call this with the owning space instead. " +
+        "The dashboard's Design view shows DESIGN.md, not these tokens.",
+      inputSchema: spaceInput.extend({
+        tokens: z
+          .record(z.string(), z.unknown())
+          .describe(`The complete token set, grouped as ${Object.keys(TOKEN_GROUPS).join(", ")}.`),
+      }),
+      outputSchema: setDesignSystemTokensOutput,
+      // Replaces the stored set rather than adding to it, like set_page_blocks.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, tokens }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const system = space.design_system_id ? await getDesignSystem(space.design_system_id) : null;
+      if (!system) return toolError(`${space.name} has no design system selected, so there are no tokens to set.`);
+
+      if (system.owner_space_id !== space.id) {
+        return toolError(
+          system.owner_space_slug
+            ? `${space.name} uses "${system.name}", which ${system.owner_space_name ?? system.owner_space_slug} ` +
+                `owns. Call this with space "${system.owner_space_slug}" to edit it for every space that uses it.`
+            : `${space.name} uses "${system.name}", which no space owns, so it cannot be edited here.`,
+        );
+      }
+
+      const result = await setDesignSystemTokens(system.id, tokens);
+      if (!result.saved) return refused(result.problems);
+
+      const borrowers = space.design_system_borrowers;
+      const tokenCount = countTokens(tokens);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Saved ${tokenCount} tokens to "${system.name}".` +
+              (borrowers ? ` ${borrowers} other space(s) use it and changed too.` : ""),
+          },
+        ],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          designSystem: { id: system.id, name: system.name, tokenCount },
+          alsoUsedBy: borrowers,
         },
       };
     },
@@ -995,6 +1073,23 @@ const BLOCK_GUIDE =
   "values maps the component's prop keys to strings. " +
   `Blocks nest at most ${DOC_LIMITS.depth} deep, and a page holds at most ${DOC_LIMITS.blocks}.`;
 
+/** Shared by every tool that writes a page body, so a refusal reads the same. */
+function bodyRefused(problems: string[]) {
+  return toolError(`The editor cannot keep all of that, so nothing was saved:\n- ${problems.join("\n- ")}`);
+}
+
+/** The body fields `set_page_blocks` and `create_page` both take. */
+const bodyInput = {
+  doc: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("The complete page body, as blocks. Send this or html, not both."),
+  html: z
+    .string()
+    .optional()
+    .describe("A complete body as HTML, converted to blocks. Send this or doc, not both."),
+};
+
 const countBlocks = (content: Block[]): number =>
   content.reduce(
     (total, block) =>
@@ -1068,16 +1163,7 @@ function registerSetPageBlocks(server: McpServer) {
         "html is still accepted for a body written the old way: it is converted " +
         "to blocks and checked the same way. " +
         BLOCK_GUIDE,
-      inputSchema: pageInput.extend({
-        doc: z
-          .record(z.string(), z.unknown())
-          .optional()
-          .describe("The complete page body, as blocks. Send this or html, not both."),
-        html: z
-          .string()
-          .optional()
-          .describe("A complete body as HTML, converted to blocks. Send this or doc, not both."),
-      }),
+      inputSchema: pageInput.extend(bodyInput),
       outputSchema: setPageBodyOutput,
       // Replaces content rather than adding to it, so it is destructive even
       // though sending the same document twice leaves the same document.
@@ -1096,11 +1182,7 @@ function registerSetPageBlocks(server: McpServer) {
 
       const body = doc ?? fromLegacyHtml(html ?? "");
       const result = await setPageDoc(page.id, body);
-      if (!result.saved) {
-        return toolError(
-          `The editor cannot keep all of that, so nothing was saved:\n- ${result.problems.join("\n- ")}`,
-        );
-      }
+      if (!result.saved) return bodyRefused(result.problems);
 
       const blocks = countBlocks(checkPageDoc(body).doc.content);
       return {
@@ -1118,6 +1200,240 @@ function registerSetPageBlocks(server: McpServer) {
   );
 }
 
+const pagePath = (space: string, page: string) => `/dashboard/${space}/pages/${page}`;
+
+const createPageOutput = z.object({
+  space: spaceRef,
+  page: pageRef,
+  blocks: z.number().int(),
+  dashboardPath: z.string(),
+});
+
+function registerCreatePage(server: McpServer) {
+  server.registerTool(
+    "create_page",
+    {
+      title: "Create page",
+      description:
+        "Add a page to a space. The slug is derived from the title and gets a " +
+        "numeric suffix if the space already has it, so use the slug this " +
+        "returns rather than guessing it. The body is optional — without one " +
+        "the page starts empty — and follows the same rules as set_page_blocks: " +
+        "a body the editor cannot keep is refused whole, with the reasons, and " +
+        "no page is created. " +
+        BLOCK_GUIDE,
+      inputSchema: spaceInput.extend({
+        title: z.string().trim().min(1).max(LIMITS.pageTitle).describe("The page's title."),
+        ...bodyInput,
+      }),
+      outputSchema: createPageOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ space: slug, title, doc, html }) => {
+      if (doc !== undefined && html !== undefined) {
+        return toolError("Send the body as doc or as html, not both — or neither for an empty page.");
+      }
+
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const body = doc ?? (html === undefined ? undefined : fromLegacyHtml(html));
+      const result = await createPage(space.id, title, body);
+      if (!result) return toolError(`Could not find a free slug for "${title}" in ${space.name}. Try a different title.`);
+      if (!result.saved) return bodyRefused(result.problems);
+
+      const blocks = body === undefined ? 0 : countBlocks(checkPageDoc(body).doc.content);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Created ${title} (${result.slug}) in ${space.name}` + (blocks ? ` with ${blocks} blocks.` : ", empty."),
+          },
+        ],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          page: { id: result.id, title, slug: result.slug },
+          blocks,
+          dashboardPath: pagePath(space.slug, result.slug),
+        },
+      };
+    },
+  );
+}
+
+const renamePageOutput = z.object({
+  space: spaceRef,
+  page: pageRef,
+  previousTitle: z.string(),
+});
+
+function registerRenamePage(server: McpServer) {
+  server.registerTool(
+    "rename_page",
+    {
+      title: "Rename page",
+      description:
+        "Change a page's title, by space and page slug. The slug stays as it " +
+        "is, so links to the page keep working; the body is untouched.",
+      inputSchema: pageInput.extend({
+        title: z.string().trim().min(1).max(LIMITS.pageTitle).describe("The page's new title."),
+      }),
+      outputSchema: renamePageOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ space: slug, page: pageSlug, title }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const page = await getPage(space.id, pageSlug);
+      if (!page || !(await renamePage(page.id, title))) return pageNotFound(pageSlug, space.name);
+
+      return {
+        content: [{ type: "text" as const, text: `Renamed ${page.title} to ${title} in ${space.name}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          page: { id: page.id, title, slug: page.slug },
+          previousTitle: page.title,
+        },
+      };
+    },
+  );
+}
+
+const deletePageOutput = z.object({ space: spaceRef, page: pageRef });
+
+function registerDeletePage(server: McpServer) {
+  server.registerTool(
+    "delete_page",
+    {
+      title: "Delete page",
+      description:
+        "Delete a page and its whole body, by space and page slug. This cannot " +
+        "be undone. Nothing else is removed: components the page used stay in " +
+        "the space.",
+      inputSchema: pageInput,
+      outputSchema: deletePageOutput,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, page: pageSlug }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const page = await getPage(space.id, pageSlug);
+      if (!page || !(await deletePage(space.id, page.id))) return pageNotFound(pageSlug, space.name);
+
+      return {
+        content: [{ type: "text" as const, text: `Deleted ${page.title} (${page.slug}) from ${space.name}.` }],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          page: { id: page.id, title: page.title, slug: page.slug },
+        },
+      };
+    },
+  );
+}
+
+const renameSpaceOutput = z.object({
+  name: z.string(),
+  slug: z.string(),
+  previousName: z.string(),
+});
+
+function registerRenameSpace(server: McpServer) {
+  server.registerTool(
+    "rename_space",
+    {
+      title: "Rename space",
+      description:
+        "Change a space's display name. The slug stays as it is, so every tool " +
+        "call and dashboard link that uses it keeps working.",
+      inputSchema: spaceInput.extend({
+        name: z.string().trim().min(1).max(LIMITS.spaceName).describe("The space's new name."),
+      }),
+      outputSchema: renameSpaceOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ space: slug, name }) => {
+      const space = await getSpace(slug);
+      if (!space || !(await renameSpace(space.id, name))) return spaceNotFound(slug);
+
+      return {
+        content: [{ type: "text" as const, text: `Renamed ${space.name} to ${name}; the slug is still ${space.slug}.` }],
+        structuredContent: { name, slug: space.slug, previousName: space.name },
+      };
+    },
+  );
+}
+
+const deleteSpaceOutput = z.object({
+  name: z.string(),
+  slug: z.string(),
+  deletedPages: z.number().int(),
+  deletedComponents: z.number().int(),
+  spacesLeftWithoutDesignSystem: z.number().int(),
+});
+
+function registerDeleteSpace(server: McpServer) {
+  server.registerTool(
+    "delete_space",
+    {
+      title: "Delete space",
+      description:
+        "Delete a space and everything in it: every page and its body, every " +
+        "component, and the design system the space owns. This cannot be " +
+        "undone. Other spaces that use this space's design system are left with " +
+        "none, and components other spaces imported from it keep their copies " +
+        "but lose the link. Call get_space first to see what it holds, and " +
+        "pass the page count it reports as confirmPageCount.",
+      inputSchema: spaceInput.extend({
+        confirmPageCount: z
+          .number()
+          .int()
+          .min(0)
+          .describe("The space's current page count, as get_space reports it. Nothing is deleted if it differs."),
+      }),
+      outputSchema: deleteSpaceOutput,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, confirmPageCount }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      // Something only a fresh read of this space would know, so a wrong or
+      // stale slug fails here instead of cascading. The real count is not
+      // echoed back: retrying with it would make the check a formality.
+      if (confirmPageCount !== space.page_count) {
+        return toolError(
+          `confirmPageCount does not match ${space.name} (${space.slug}), so nothing was deleted. ` +
+            "Call get_space, check this is the space you mean, and pass the page count it reports.",
+        );
+      }
+
+      if (!(await deleteSpace(space.id))) return spaceNotFound(slug);
+
+      const borrowers = space.design_system_borrowers;
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Deleted ${space.name} (${space.slug}) with its ${space.page_count} pages and ` +
+              `${space.component_count} components.` +
+              (borrowers ? ` ${borrowers} other space(s) used its design system and now have none.` : ""),
+          },
+        ],
+        structuredContent: {
+          name: space.name,
+          slug: space.slug,
+          deletedPages: space.page_count,
+          deletedComponents: space.component_count,
+          spacesLeftWithoutDesignSystem: borrowers,
+        },
+      };
+    },
+  );
+}
+
 /**
  * Built per request: `createMcpHandler` calls this factory for every exchange,
  * so the server instance must not be shared or cached across requests.
@@ -1127,13 +1443,19 @@ export function createCmsyMcpServer(): McpServer {
   registerListSpaces(server);
   registerListPages(server);
   registerGetPage(server);
+  registerCreatePage(server);
   registerSetPageBlocks(server);
+  registerRenamePage(server);
+  registerDeletePage(server);
   registerListComponents(server);
   registerGetDesignSystem(server);
   registerListDesignSystems(server);
   registerUseDesignSystem(server);
+  registerSetDesignSystemTokens(server);
   registerGetSpace(server);
   registerCreateSpace(server);
+  registerRenameSpace(server);
+  registerDeleteSpace(server);
   registerCreateComponent(server);
   registerUpdateComponent(server);
   registerDeleteComponent(server);

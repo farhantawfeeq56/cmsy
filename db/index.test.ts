@@ -213,6 +213,90 @@ describe("createSpace", () => {
   });
 });
 
+describe("space writes", () => {
+  it("binds a new name rather than splicing it into the SQL, and leaves the slug", async () => {
+    const hostile = "x'; drop table spaces; --";
+    const { renameSpace } = await load();
+    expect(await renameSpace("s1", hostile)).toBe(false);
+    expect(calls[0].values).toEqual([hostile, "s1"]);
+    expect(calls[0].sql).not.toContain(hostile);
+    expect(calls[0].sql).not.toMatch(/slug/);
+  });
+
+  it("deletes one space by id — the children cascade in the schema", async () => {
+    nextRows = [{ id: "s1" }];
+    const { deleteSpace } = await load();
+    expect(await deleteSpace("s1")).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toMatch(/delete from spaces where id = \$\?/);
+  });
+});
+
+describe("page writes", () => {
+  it("creates an empty page, as the column default has it, under a free slug", async () => {
+    nextRows = [{ id: "p1" }];
+    const { createPage } = await load();
+    expect(await createPage("s1", "Pricing Plans")).toEqual({ saved: true, id: "p1", slug: "pricing-plans" });
+    expect(calls[0].sql).toMatch(/on conflict \(space_id, slug\) do nothing/);
+    expect(calls[0].values).toEqual(["s1", "Pricing Plans", "pricing-plans", "[]"]);
+  });
+
+  it("stores a body it was given, in the same insert", async () => {
+    nextRows = [{ id: "p1" }];
+    const { createPage } = await load();
+    const body = DOC({ type: "Text", props: { id: "t1", text: "<p>Hi</p>" } });
+    await createPage("s1", "Pricing", body);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0].values[3] as string)).toEqual(body);
+  });
+
+  it("inserts nothing when the body has a problem", async () => {
+    const { createPage } = await load();
+    const result = await createPage("s1", "Pricing", DOC({ type: "Iframe", props: { id: "x" } }));
+    expect(result).toMatchObject({ saved: false });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reports null when no slug is free", async () => {
+    const { createPage } = await load();
+    expect(await createPage("s1", "Pricing")).toBeNull();
+  });
+
+  it("renames by id and deletes within the given space", async () => {
+    const { renamePage, deletePage } = await load();
+    expect(await renamePage("p1", "Plans")).toBe(false);
+    expect(calls[0].sql).not.toMatch(/slug/);
+    nextRows = [{ id: "p1" }];
+    expect(await deletePage("s1", "p1")).toBe(true);
+    expect(calls[1].sql).toMatch(/where id = \$\? and space_id = \$\?/);
+  });
+});
+
+describe("setDesignSystemTokens", () => {
+  it("replaces the tokens of one system by id", async () => {
+    nextRows = [{ id: "d1" }];
+    const { setDesignSystemTokens } = await load();
+    const tokens = { colors: { primary: "#111" } };
+    expect(await setDesignSystemTokens("d1", tokens)).toEqual({ saved: true });
+    expect(calls[0].sql).toMatch(/update design_systems\s+set tokens = \$\?::jsonb\s+where id = \$\?/);
+    expect(calls[0].values).toEqual([JSON.stringify(tokens), "d1"]);
+  });
+
+  it("writes nothing when the set has a problem", async () => {
+    const { setDesignSystemTokens } = await load();
+    expect(await setDesignSystemTokens("d1", { shadows: {} })).toMatchObject({ saved: false });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reports a system that is not there instead of claiming a save", async () => {
+    const { setDesignSystemTokens } = await load();
+    expect(await setDesignSystemTokens("missing", {})).toEqual({
+      saved: false,
+      problems: ["that design system does not exist"],
+    });
+  });
+});
+
 describe("component writes", () => {
   it("reports a taken name as null instead of inserting a duplicate", async () => {
     const { createComponent } = await load();

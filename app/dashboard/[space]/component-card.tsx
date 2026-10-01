@@ -72,7 +72,7 @@ function PropsTable({ props }: { props: Prop[] }) {
 
 export function ComponentCard({ component }: { component: ComponentRow }) {
   const [open, setOpen] = useState(false);
-  const cardRef = useRef<HTMLLIElement>(null);
+  const cardRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const props = parseProps(component.props);
 
@@ -129,47 +129,42 @@ export function ComponentCard({ component }: { component: ComponentRow }) {
 
   return (
     <>
-      <li
-        ref={cardRef}
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setOpen(true);
-          }
-        }}
-        className="flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-card transition-shadow hover:shadow-[0_8px_24px_#1111110d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-      >
-        <div
-          className="pointer-events-none flex min-h-44 items-center justify-center border-b border-line p-6"
-          style={{
-            backgroundColor: "#ffffff",
-            backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
-            backgroundSize: "14px 14px",
-          }}
+      <li className="overflow-hidden rounded-xl border border-line bg-card transition-shadow hover:shadow-[0_8px_24px_#1111110d]">
+        <button
+          ref={cardRef}
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full flex-col text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
         >
-          <Preview props={props} template={component.template} />
-        </div>
+          <div
+            className="pointer-events-none flex min-h-44 items-center justify-center border-b border-line p-6"
+            style={{
+              backgroundColor: "#ffffff",
+              backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
+              backgroundSize: "14px 14px",
+            }}
+          >
+            <Preview props={props} template={component.template} />
+          </div>
 
-        <div className="flex flex-1 flex-col gap-2 p-5">
-          <h3 className="truncate text-base font-semibold tracking-tight">{component.name}</h3>
+          <div className="flex flex-1 flex-col gap-2 p-5">
+            <h3 className="truncate text-base font-semibold tracking-tight">{component.name}</h3>
 
-          {component.description && (
-            <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
-          )}
-
-          <p className="mt-auto pt-1">
-            {component.origin_space_name ? (
-              <span className="badge">
-                Imported · {component.origin_name} from {component.origin_space_name}
-              </span>
-            ) : (
-              <span className="badge badge-quiet">Local</span>
+            {component.description && (
+              <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
             )}
-          </p>
-        </div>
+
+            <p className="mt-auto pt-1">
+              {component.origin_space_name ? (
+                <span className="badge">
+                  Imported · {component.origin_name} from {component.origin_space_name}
+                </span>
+              ) : (
+                <span className="badge badge-quiet">Local</span>
+              )}
+            </p>
+          </div>
+        </button>
       </li>
 
       {open &&

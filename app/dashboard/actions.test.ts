@@ -15,7 +15,11 @@ vi.mock("@/db", async (importOriginal) => ({
       },
   ),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+  updateTag: vi.fn(),
+  unstable_cache: (read: unknown) => read,
+}));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
 const { createSpace: insertSpace } = await import("@/db");
@@ -71,6 +75,13 @@ describe("renameSpace", () => {
     await renameSpace(form({ id: "../other", name: "Renamed" }));
 
     expect(queries).toHaveLength(0);
+  });
+
+  it("expires the cached dashboard reads, so the next render shows the new name", async () => {
+    const { updateTag } = await import("next/cache");
+    await renameSpace(form({ id: "483472dd-8c7d-4828-aee7-6131ad393dc3", name: "Renamed" }));
+
+    expect(updateTag).toHaveBeenCalledWith("dashboard-data");
   });
 });
 

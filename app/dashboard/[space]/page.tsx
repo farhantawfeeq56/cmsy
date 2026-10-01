@@ -199,7 +199,7 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
 
 /**
  * The rules every component is built to. Components and tokens are authored
- * through the MCP server; the choice of system is not, so it is made here.
+ * through the MCP server; the choice of system can be made here as well.
  */
 async function DesignSystemSection({
   spaceId,
@@ -275,7 +275,7 @@ async function DesignSystemSection({
           </div>
         </details>
 
-        {/* The MCP has no setter for this, so the choice is made here — a plain
+        {/* The same choice an agent makes with use_design_system — a plain
             form rather than the old popover, since it is not the rail's point.
             Hidden when the space already points at the only system there is:
             the one available action would be to reselect it. */}

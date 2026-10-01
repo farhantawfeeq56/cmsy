@@ -7,8 +7,6 @@ import {
   requireBearerAuth,
   validateOriginHeader,
 } from "@modelcontextprotocol/server";
-import { revalidateTag } from "next/cache";
-import { DASHBOARD_DATA } from "@/app/dashboard/cached";
 import { authenticateMcpToken } from "@/db";
 import { LOOPBACK, hostnameOf, isLoopbackHost } from "@/mcp/endpoint";
 import { hashToken, isIssuedToken } from "@/mcp/tokens";
@@ -119,44 +117,7 @@ async function guarded(request: Request): Promise<Response> {
     if (auth instanceof Response) return auth;
   }
 
-  if (request.method !== "POST") return handler.fetch(request);
-
-  const writes = await writeToolCalls(request);
-  const response = await handler.fetch(request);
-  if (!writes) return response;
-
-  // The tool has run once its reply is complete, so read the reply out before
-  // expiring the dashboard's cached reads. Expiring first would let a render in
-  // between cache the row the write was about to change.
-  //
-  // Reading it whole assumes a write tool answers with one short reply, which
-  // every tool in `mcp/server.ts` does. A write tool that streams progress over
-  // SSE would arrive at the client in one piece, so it would need this changed.
-  const body = await response.text();
-  // Not awaited, and safe on Workers: vinext hands the KV write behind
-  // `revalidateTag` to the request's `waitUntil`, so it outlives the response.
-  revalidateTag(DASHBOARD_DATA, { expire: 0 });
-  return new Response(body, response);
-}
-
-/**
- * Whether a JSON-RPC message, or any message in a batch, calls a tool that can
- * write. The tools are named for what they do: `get_*` and `list_*` read, and
- * everything else may change a row the dashboard shows. Expiring the cache for
- * a call that turns out to change nothing costs one extra read.
- */
-export async function writeToolCalls(request: Request): Promise<boolean> {
-  const parsed: unknown = await request
-    .clone()
-    .json()
-    .catch(() => null);
-  const messages = Array.isArray(parsed) ? parsed : [parsed];
-  return messages.some((message) => {
-    if (!message || typeof message !== "object") return false;
-    const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
-    const name = params?.name;
-    return method === "tools/call" && typeof name === "string" && !/^(get|list)_/.test(name);
-  });
+  return handler.fetch(request);
 }
 
 /**

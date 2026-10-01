@@ -232,3 +232,36 @@ body {
   .doc-title { font-size: 2rem; letter-spacing: -1px; }
   .doc-page { padding: 1.5rem 1rem 8rem; }
 }
+
+/* The page editor sits under the dashboard header, so Puck's own full-height
+   chrome must stay inside it: it should read as one more dashboard surface
+   (paper over card, hairline borders), not a standalone app. Puck's internals
+   are hashed classes, so the skin goes through its CSS variables plus a few
+   scoped layout fixes. */
+/* The dashboard header above is py-3.5 with a text-lg brand line ≈ 3.5rem,
+   so the editor fills the rest of the viewport without the page scrolling. */
+.page-shell ._PuckLayout_tzaxg_36 { height: calc(100dvh - 3.5rem); }
+.page-shell ._PuckLayout-inner_tzaxg_40 {
+  --puck-color-surface: var(--color-card);
+  --puck-color-surface-muted: var(--color-paper);
+  --puck-color-surface-subtle: var(--color-paper);
+  --puck-color-border: var(--color-line);
+  --puck-color-border-muted: var(--color-paper);
+  --puck-color-text: var(--color-ink);
+  --puck-color-text-secondary: var(--color-smoke);
+  --puck-color-text-muted: var(--color-smoke);
+  --puck-color-text-subtle: #11111133;
+  --puck-color-interactive: var(--color-ink);
+  --puck-color-interactive-hover: #111111;
+  --puck-color-interactive-subtle: #b7efb21a;
+  --puck-color-interactive-soft: var(--color-mint);
+  --puck-color-interactive-soft-hover: #a4e8a0;
+  --puck-color-interactive-neutral-hover: #1111110d;
+  --puck-color-interactive-inverse-hover: #111111;
+  --puck-color-interactive-inverse-active: #111111;
+  --puck-color-focus-ring: var(--color-ink);
+  --puck-color-selection-bg: #b7efb233;
+  --puck-color-selection-border: #b7efb2;
+  --puck-color-line-placeholder: #b7efb2;
+  --puck-font-family: var(--font-secondary), Arial, sans-serif;
+}

@@ -228,50 +228,55 @@ export function PageEditor({
           : "Saved";
 
   return (
-    <Puck
-      config={config}
-      data={initial as Data}
-      onChange={onChange}
-      // Rendered in the page itself rather than an iframe, so the canvas reads
-      // the app's own stylesheet and fonts without copying them across.
-      iframe={{ enabled: false }}
-      overrides={{
-        header: () => (
-          <header className="border-b border-line bg-paper">
-            <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
-              <Link href={`/dashboard/${space.slug}`} className="btn-quiet -ml-2 shrink-0 rounded-md">
-                ← {space.name}
-              </Link>
-              <input
-                className="min-w-0 flex-1 bg-transparent text-lg outline-none"
-                value={title}
-                maxLength={120}
-                aria-label="Page title"
-                onChange={(event) => setTitle(event.target.value)}
-                onBlur={(event) => commitTitle(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                  }
-                }}
-              />
-              <span
-                className={`text-xs ${status === "refused" ? "text-ink" : "text-smoke"}`}
-                aria-live="polite"
-              >
-                {statusLabel}
-              </span>
-              <Link
-                href={`/dashboard/${space.slug}?view=design#components`}
-                className="text-xs text-smoke hover:text-ink"
-              >
-                Edit components in Design →
-              </Link>
-            </div>
-          </header>
-        ),
-      }}
-    />
+    <div className="page-shell">
+      <Puck
+        config={config}
+        data={initial as Data}
+        onChange={onChange}
+        // Rendered in the page itself rather than an iframe, so the canvas reads
+        // the app's own stylesheet and fonts without copying them across.
+        iframe={{ enabled: false }}
+        overrides={{
+          header: () => (
+            <header className="border-b border-line bg-paper">
+              <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
+                <Link
+                  href={`/dashboard/${space.slug}`}
+                  className="btn-quiet -ml-2 shrink-0 rounded-md"
+                >
+                  ← {space.name}
+                </Link>
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-lg outline-none"
+                  value={title}
+                  maxLength={120}
+                  aria-label="Page title"
+                  onChange={(event) => setTitle(event.target.value)}
+                  onBlur={(event) => commitTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+                <span
+                  className={`text-xs ${status === "refused" ? "text-ink" : "text-smoke"}`}
+                  aria-live="polite"
+                >
+                  {statusLabel}
+                </span>
+                <Link
+                  href={`/dashboard/${space.slug}?view=design#components`}
+                  className="text-xs text-smoke hover:text-ink"
+                >
+                  Edit components in Design →
+                </Link>
+              </div>
+            </header>
+          ),
+        }}
+      />
+    </div>
   );
 }

@@ -1,12 +1,13 @@
 import { notFound, redirect } from "next/navigation";
-import { type ComponentRow, type DesignSystem } from "@/db";
-import { useDesignSystem } from "../actions";
 import {
-  cachedGetSpace,
-  cachedListComponentsInSpace,
-  cachedListDesignSystems,
-  cachedListPagesInSpace,
-} from "../cached";
+  type ComponentRow,
+  type DesignSystem,
+  getSpace,
+  listComponentsInSpace,
+  listDesignSystems,
+  listPagesInSpace,
+} from "@/db";
+import { useDesignSystem } from "../actions";
 import { ComponentCard } from "./component-card";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "./design.generated.json";
@@ -36,10 +37,10 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
   // Every query is keyed by the slug, so they all start now and cost one
   // round trip between them, rather than each waiting on the space's id.
   const [space, pages, design] = await Promise.all([
-    cachedGetSpace(slug),
-    view === "pages" ? cachedListPagesInSpace(slug) : [],
+    getSpace(slug),
+    view === "pages" ? listPagesInSpace(slug) : [],
     view === "design"
-      ? Promise.all([cachedListComponentsInSpace(slug), cachedListDesignSystems()])
+      ? Promise.all([listComponentsInSpace(slug), listDesignSystems()])
       : null,
   ]);
   if (!space) notFound();

@@ -6,17 +6,10 @@ import { hashToken } from "@/mcp/tokens";
 vi.mock("@/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db")>()),
   authenticateMcpToken: vi.fn(),
-  createSpace: vi.fn(),
-  listSpaces: vi.fn(),
-}));
-vi.mock("next/cache", () => ({
-  revalidateTag: vi.fn(),
-  unstable_cache: (read: unknown) => read,
 }));
 
-const { authenticateMcpToken, createSpace, listSpaces } = await import("@/db");
-const { revalidateTag } = await import("next/cache");
-const { POST, writeToolCalls } = await import("./route");
+const { authenticateMcpToken } = await import("@/db");
+const { POST } = await import("./route");
 
 const PUBLIC = "cmsy.example.dev";
 const SHARED = "a-long-shared-secret-for-tests";
@@ -107,51 +100,5 @@ describe("POST /api/mcp: bearer auth off loopback", () => {
     vi.mocked(authenticateMcpToken).mockResolvedValue(null);
     const response = await POST(initialize(PUBLIC, bearer("cmsy_revoked")));
     expect(response.status).toBe(401);
-  });
-});
-
-describe("cache invalidation", () => {
-  const toolCall = (name: string, args: Record<string, unknown>) =>
-    new Request("http://localhost/api/mcp", {
-      method: "POST",
-      headers: { host: "localhost", "content-type": "application/json", accept: "application/json, text/event-stream" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
-    });
-
-  beforeEach(() => vi.mocked(revalidateTag).mockClear());
-
-  it("expires the dashboard's cached reads once a write tool has replied", async () => {
-    let wrote = false;
-    vi.mocked(createSpace).mockImplementation(async () => {
-      wrote = true;
-      return { id: "s-new", slug: "docs" };
-    });
-    vi.mocked(revalidateTag).mockImplementation(() => {
-      expect(wrote).toBe(true);
-      return undefined;
-    });
-
-    const response = await POST(toolCall("create_space", { name: "Docs" }));
-    expect(await response.text()).toMatch(/Created space Docs/);
-    expect(revalidateTag).toHaveBeenCalledWith("dashboard-data", { expire: 0 });
-  });
-
-  it("leaves the cache alone for a read", async () => {
-    vi.mocked(listSpaces).mockResolvedValue([]);
-    const response = await POST(toolCall("list_spaces", {}));
-    expect(response.status).toBe(200);
-    expect(revalidateTag).not.toHaveBeenCalled();
-  });
-
-  it("reads tool names from a batch, and ignores anything that is not a tool call", async () => {
-    const post = (body: unknown) =>
-      new Request("http://localhost/api/mcp", { method: "POST", body: JSON.stringify(body) });
-
-    expect(await writeToolCalls(post([
-      { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_page" } },
-      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "set_page_blocks" } },
-    ]))).toBe(true);
-    expect(await writeToolCalls(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }))).toBe(false);
-    expect(await writeToolCalls(new Request("http://localhost/api/mcp", { method: "POST", body: "not json" }))).toBe(false);
   });
 });

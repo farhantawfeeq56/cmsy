@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { type ActivityItem } from "@/db";
-import { cachedListRecentActivity, cachedListSpaces } from "./cached";
+import { listRecentActivity, listSpaces, type ActivityItem } from "@/db";
 import { ago } from "./ago";
 import { createSpace } from "./actions";
 import { SpaceRail } from "./space-rail";
@@ -56,7 +55,7 @@ export default function DashboardPage() {
 }
 
 async function Spaces() {
-  const spaces = await cachedListSpaces();
+  const spaces = await listSpaces();
 
   return spaces.length === 0 ? (
     <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
@@ -68,7 +67,7 @@ async function Spaces() {
 }
 
 async function Activity() {
-  const activity = await cachedListRecentActivity();
+  const activity = await listRecentActivity();
 
   return activity.length === 0 ? (
     <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">

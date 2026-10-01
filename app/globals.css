@@ -113,6 +113,24 @@ body {
   color: var(--color-smoke);
 }
 
+/* Motion a component template may name (#113, `CLASSES` in db/page-html.ts).
+   A template cannot carry `transition` or `animation` itself, so the motion it
+   can reach is this fixed set: an entrance on first paint, and a hover lift. */
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes slide-in { from { opacity: 0; transform: translateY(0.5rem); } }
+@keyframes slide-in-start { from { opacity: 0; transform: translateX(-1rem); } }
+
+.fade-in { animation: fade-in 300ms ease-out both; }
+.slide-in { animation: slide-in 300ms ease-out both; }
+.slide-in-start { animation: slide-in-start 300ms ease-out both; }
+.hover-lift { transition: transform 150ms ease, box-shadow 150ms ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 16px #11111114; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .slide-in, .slide-in-start { animation: none; }
+  .hover-lift, .hover-lift:hover { transition: none; transform: none; }
+}
+
 /* Page editor — a document surface, not a design surface (see DESIGN.md).
    The canvas markup is built as HTML strings, so it is styled here rather
    than with utility classes. */

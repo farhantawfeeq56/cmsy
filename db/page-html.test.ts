@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageHtmlProblems } from "./page-html";
+import { keptClasses, pageHtmlProblems } from "./page-html";
 
 /** The markup the editor itself produces, which must always pass. */
 const editorDocument = `<h1>Pricing</h1><p>Simple, <strong>honest</strong> pricing.</p>
@@ -74,6 +74,13 @@ describe("pageHtmlProblems", () => {
     const tier =
       '<div class="card"><span class="badge">Popular</span><a class="btn" href="/signup">Go</a></div>';
     expect(pageHtmlProblems(tier)).toEqual([]);
+  });
+
+  it("keeps the motion classes, so an animated template survives a save", () => {
+    expect(pageHtmlProblems('<div class="slide-in-start"><div class="card fade-in hover-lift">Hi</div></div>'))
+      .toEqual([]);
+    expect(keptClasses("fade-in slide-in slide-in-start hover-lift spin", { island: false, inIsland: false, earned: false }))
+      .toEqual(["fade-in", "slide-in", "slide-in-start", "hover-lift"]);
   });
 
   it("reports a class only an island can earn", () => {

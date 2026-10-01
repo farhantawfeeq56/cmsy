@@ -241,6 +241,10 @@ body {
 /* The dashboard header above is py-3.5 with a text-lg brand line ≈ 3.5rem,
    so the editor fills the rest of the viewport without the page scrolling. */
 .page-shell ._PuckLayout_tzaxg_36 { height: calc(100dvh - 3.5rem); }
+
+/* A document has no box of its own: the reading column sits on the paper and
+   only the selection overlays register as chrome. */
+.page-shell ._PuckCanvas-root_zw9iy_43 { outline: none; }
 .page-shell ._PuckLayout-inner_tzaxg_40 {
   --puck-color-surface: var(--color-card);
   --puck-color-surface-muted: var(--color-paper);

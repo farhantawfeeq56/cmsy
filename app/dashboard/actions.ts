@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createComponent as insertComponent,
@@ -17,6 +17,7 @@ import {
   updateComponent as setComponent,
 } from "@/db";
 import { parseProps, parseTemplate, type Prop } from "@/db/component-template";
+import { DASHBOARD_DATA } from "./cached";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -30,7 +31,15 @@ function uuid(value: FormDataEntryValue | null) {
   return UUID.test(raw) ? raw : null;
 }
 
-const refresh = () => revalidatePath("/dashboard", "layout");
+/**
+ * After every write: expire the cached reads (`./cached`), so the next render
+ * reads the database rather than a row the write just changed, and re-render
+ * the dashboard.
+ */
+const refresh = () => {
+  updateTag(DASHBOARD_DATA);
+  revalidatePath("/dashboard", "layout");
+};
 
 /**
  * The props a component declares, written one per line as `key | Label |

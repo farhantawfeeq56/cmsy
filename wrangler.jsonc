@@ -6,6 +6,13 @@
     "nodejs_compat"
   ],
   "main": "vinext/server/fetch-handler",
+  // Backs vinext's data cache (`kvDataAdapter` in vite.config.ts) — #99.
+  "kv_namespaces": [
+    {
+      "binding": "VINEXT_KV_CACHE",
+      "id": "8c12aa37d6134375a88424fa0a9d2155"
+    }
+  ],
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",

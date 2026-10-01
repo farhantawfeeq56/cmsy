@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { componentProblems, parseProps, renderComponent, type Prop } from "@/db/component-template";
 
 type Component = {
@@ -80,115 +81,154 @@ function PropsTable({ props }: { props: Prop[] }) {
 
 export function ComponentCard({ component }: { component: Component }) {
   const [open, setOpen] = useState(false);
+  const cardRef = useRef<HTMLLIElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const props = parseProps(component.props);
 
   useEffect(() => {
     if (!open) return;
+
+    // Move focus into the dialog and trap Tab there while it is open.
+    const dialog = dialogRef.current;
+    const card = cardRef.current;
+    dialog?.focus();
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      // Return focus to the card that opened the dialog.
+      card?.focus();
+    };
   }, [open]);
 
   return (
-    <li
-      role="button"
-      tabIndex={0}
-      onClick={() => setOpen(true)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          setOpen(true);
-        }
-      }}
-      className="flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-card transition-shadow hover:shadow-[0_8px_24px_#1111110d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-    >
-      <div
-        className="pointer-events-none flex min-h-44 items-center justify-center border-b border-line p-6"
-        style={{
-          backgroundColor: "#ffffff",
-          backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
-          backgroundSize: "14px 14px",
+    <>
+      <li
+        ref={cardRef}
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen(true);
+          }
         }}
+        className="flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-card transition-shadow hover:shadow-[0_8px_24px_#1111110d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
       >
-        <Preview props={props} template={component.template} />
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 p-5">
-        <h3 className="truncate text-base font-semibold tracking-tight">{component.name}</h3>
-
-        {component.description && (
-          <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
-        )}
-
-        <p className="mt-auto pt-1">
-          {component.origin_space_name ? (
-            <span className="badge">
-              Imported · {component.origin_name} from {component.origin_space_name}
-            </span>
-          ) : (
-            <span className="badge badge-quiet">Local</span>
-          )}
-        </p>
-      </div>
-
-      {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setOpen(false)}
+          className="pointer-events-none flex min-h-44 items-center justify-center border-b border-line p-6"
+          style={{
+            backgroundColor: "#ffffff",
+            backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
+            backgroundSize: "14px 14px",
+          }}
         >
-          <div className="absolute inset-0 bg-[#11111133]" />
+          <Preview props={props} template={component.template} />
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2 p-5">
+          <h3 className="truncate text-base font-semibold tracking-tight">{component.name}</h3>
+
+          {component.description && (
+            <p className="text-sm leading-relaxed text-smoke">{component.description}</p>
+          )}
+
+          <p className="mt-auto pt-1">
+            {component.origin_space_name ? (
+              <span className="badge">
+                Imported · {component.origin_name} from {component.origin_space_name}
+              </span>
+            ) : (
+              <span className="badge badge-quiet">Local</span>
+            )}
+          </p>
+        </div>
+      </li>
+
+      {open &&
+        createPortal(
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={component.name}
-            onClick={(event) => event.stopPropagation()}
-            className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-[0_24px_60px_#11111126]"
+            tabIndex={-1}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 outline-none"
           >
-            <div className="flex items-start justify-between gap-4 border-b border-line p-5">
-              <div className="min-w-0">
-                <h3 className="truncate text-base font-semibold tracking-tight">
-                  {component.name}
-                </h3>
-                <p className="mt-1 text-xs text-smoke">
-                  {props.length} {props.length === 1 ? "prop" : "props"}
-                </p>
+            <div
+              className="absolute inset-0 bg-[#11111133]"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-[0_24px_60px_#11111126]"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-line p-5">
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-semibold tracking-tight">
+                    {component.name}
+                  </h3>
+                  <p className="mt-1 text-xs text-smoke">
+                    {props.length} {props.length === 1 ? "prop" : "props"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-md text-smoke transition-colors hover:bg-[#1111110d] hover:text-ink"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md text-smoke transition-colors hover:bg-[#1111110d] hover:text-ink"
-              >
-                ✕
-              </button>
+
+              <div className="overflow-y-auto p-5">
+                <div
+                  className="flex min-h-64 items-center justify-center rounded-xl border border-line p-10"
+                  style={{
+                    backgroundColor: "#ffffff",
+                    backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
+                    backgroundSize: "14px 14px",
+                  }}
+                >
+                  <Preview props={props} template={component.template} wide />
+                </div>
+
+                {component.description && (
+                  <p className="mt-4 text-sm leading-relaxed text-smoke">{component.description}</p>
+                )}
+
+                <h4 className="label mt-5 font-semibold">Props</h4>
+                <div className="mt-3">
+                  <PropsTable props={props} />
+                </div>
+              </div>
             </div>
-
-            <div className="overflow-y-auto p-5">
-              <div
-                className="flex min-h-64 items-center justify-center rounded-xl border border-line p-10"
-                style={{
-                  backgroundColor: "#ffffff",
-                  backgroundImage: "radial-gradient(#1111110f 1px, transparent 1px)",
-                  backgroundSize: "14px 14px",
-                }}
-              >
-                <Preview props={props} template={component.template} wide />
-              </div>
-
-              {component.description && (
-                <p className="mt-4 text-sm leading-relaxed text-smoke">{component.description}</p>
-              )}
-
-              <h4 className="label mt-5 font-semibold">Props</h4>
-              <div className="mt-3">
-                <PropsTable props={props} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </li>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

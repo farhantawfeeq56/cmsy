@@ -168,6 +168,8 @@ non-zero on the first failure.
 | `set_page_blocks` | Replaces a page's whole body with HTML, by space and page slug. Refuses markup the editor would strip, so nothing is saved and then silently dropped. Destructive. |
 | `list_components` | Lists one space's components (name, description), and for an imported one, the component and space it came from. Takes the space slug. Read-only. |
 | `get_design_system` | Returns the design system a space uses, with its full `tokens`, and which space owns it when it is shared. Takes the space slug. Read-only. |
+| `list_design_systems` | Every design system, with its id, the space that owns it and its token count. Read-only. |
+| `use_design_system` | Points a space (`space` slug) at a design system (`designSystemId` from `list_design_systems`), its own or another space's. Refuses an id no system has. |
 | `get_space` | One space by slug: name, page and component counts, design system name. Read-only. |
 | `list_importable` | Components in other spaces this space has not imported yet, with the space each lives in. Read-only. |
 | `list_recent_activity` | The newest pages and components across all spaces (`limit`, default 5, max 50). Read-only. |

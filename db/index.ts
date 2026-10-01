@@ -123,6 +123,7 @@ export type DesignSystem = {
   name: string;
   space_id: string | null;
   space_name: string | null;
+  space_slug: string | null;
   token_count: number;
 };
 
@@ -419,7 +420,7 @@ export async function findComponent(
 // a bare top-level value, as older rows hold, counts as one.
 export const listDesignSystems = () =>
   rows<DesignSystem>(db()`
-    select d.id, d.name, d.space_id, s.name as space_name,
+    select d.id, d.name, d.space_id, s.name as space_name, s.slug as space_slug,
       (select coalesce(sum(case jsonb_typeof(g.value)
           when 'object' then (select count(*) from jsonb_object_keys(g.value))
           else 1 end), 0)::int
@@ -428,6 +429,20 @@ export const listDesignSystems = () =>
     left join spaces s on s.id = d.space_id
     order by d.created_at
   `);
+
+/**
+ * Points a space at a design system, its own or another space's. False when
+ * either the space or the system does not exist, so a caller can say which
+ * rather than report a write that never happened.
+ */
+export async function setSpaceDesignSystem(spaceId: string, designSystemId: string) {
+  const updated = await rows<{ id: string }>(db()`
+    update spaces set design_system_id = ${designSystemId}
+    where id = ${spaceId}
+      and exists (select 1 from design_systems where id = ${designSystemId})
+    returning id`);
+  return updated.length > 0;
+}
 
 export type DesignSystemTokens = {
   id: string;
@@ -439,7 +454,7 @@ export type DesignSystemTokens = {
 };
 
 /** One design system with its tokens and the space that owns it. */
-export async function getDesignSystem(id: string) {
+export async function getDesignSystem(id: string): Promise<DesignSystemTokens | null> {
   const [row] = await rows<DesignSystemTokens>(db()`
     select d.id, d.name, d.tokens,
       s.id as owner_space_id, s.name as owner_space_name, s.slug as owner_space_slug

@@ -272,6 +272,31 @@ describe("page writes", () => {
   });
 });
 
+describe("setDesignSystemTokens", () => {
+  it("replaces the tokens of one system by id", async () => {
+    nextRows = [{ id: "d1" }];
+    const { setDesignSystemTokens } = await load();
+    const tokens = { colors: { primary: "#111" } };
+    expect(await setDesignSystemTokens("d1", tokens)).toEqual({ saved: true });
+    expect(calls[0].sql).toMatch(/update design_systems\s+set tokens = \$\?::jsonb\s+where id = \$\?/);
+    expect(calls[0].values).toEqual([JSON.stringify(tokens), "d1"]);
+  });
+
+  it("writes nothing when the set has a problem", async () => {
+    const { setDesignSystemTokens } = await load();
+    expect(await setDesignSystemTokens("d1", { shadows: {} })).toMatchObject({ saved: false });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reports a system that is not there instead of claiming a save", async () => {
+    const { setDesignSystemTokens } = await load();
+    expect(await setDesignSystemTokens("missing", {})).toEqual({
+      saved: false,
+      problems: ["that design system does not exist"],
+    });
+  });
+});
+
 describe("component writes", () => {
   it("reports a taken name as null instead of inserting a duplicate", async () => {
     const { createComponent } = await load();

@@ -24,6 +24,7 @@ import {
   listSpaces,
   renamePage,
   renameSpace,
+  setDesignSystemTokens,
   setPageDoc,
   setSpaceDesignSystem,
   updateComponent,
@@ -33,6 +34,7 @@ import {
 import { CLASSES } from "../db/page-html";
 // Pure as well, so the tests read and count bodies with the real rules.
 import { checkPageDoc, DOC_LIMITS, fromLegacyHtml, readPageDoc, type Block } from "../db/page-doc";
+import { TOKEN_GROUPS } from "../db/design-tokens";
 // Also import-free, so a template is judged by the same rules the editor
 // enforces rather than by a second copy of them.
 import {
@@ -482,6 +484,77 @@ function registerUseDesignSystem(server: McpServer) {
             ownedBy,
             tokenCount: countTokens(system.tokens),
           },
+        },
+      };
+    },
+  );
+}
+
+const setDesignSystemTokensOutput = z.object({
+  space: spaceRef,
+  designSystem: z.object({ id: z.string(), name: z.string(), tokenCount: z.number().int() }),
+  alsoUsedBy: z.number().int(),
+});
+
+function registerSetDesignSystemTokens(server: McpServer) {
+  server.registerTool(
+    "set_design_system_tokens",
+    {
+      title: "Set design system tokens",
+      description:
+        "Replace the tokens of the design system a space owns and uses. This " +
+        "replaces rather than merges, so read them with get_design_system first " +
+        "and send back the full set. Tokens are grouped: colors, rounded and " +
+        "spacing map a name to a string value; typography and components map a " +
+        "name to an object of string properties. A value may refer to another " +
+        "token as {group.name}, and must refer to one this set defines. A set " +
+        "with any problem is refused whole, with the reasons. Every space that " +
+        "uses this system changes with it. A space using another space's system " +
+        "cannot edit it from here — call this with the owning space instead. " +
+        "The dashboard's Design view shows DESIGN.md, not these tokens.",
+      inputSchema: spaceInput.extend({
+        tokens: z
+          .record(z.string(), z.unknown())
+          .describe(`The complete token set, grouped as ${Object.keys(TOKEN_GROUPS).join(", ")}.`),
+      }),
+      outputSchema: setDesignSystemTokensOutput,
+      // Replaces the stored set rather than adding to it, like set_page_blocks.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ space: slug, tokens }) => {
+      const space = await getSpace(slug);
+      if (!space) return spaceNotFound(slug);
+
+      const system = space.design_system_id ? await getDesignSystem(space.design_system_id) : null;
+      if (!system) return toolError(`${space.name} has no design system selected, so there are no tokens to set.`);
+
+      if (system.owner_space_id !== space.id) {
+        return toolError(
+          system.owner_space_slug
+            ? `${space.name} uses "${system.name}", which ${system.owner_space_name ?? system.owner_space_slug} ` +
+                `owns. Call this with space "${system.owner_space_slug}" to edit it for every space that uses it.`
+            : `${space.name} uses "${system.name}", which no space owns, so it cannot be edited here.`,
+        );
+      }
+
+      const result = await setDesignSystemTokens(system.id, tokens);
+      if (!result.saved) return refused(result.problems);
+
+      const borrowers = space.design_system_borrowers;
+      const tokenCount = countTokens(tokens);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Saved ${tokenCount} tokens to "${system.name}".` +
+              (borrowers ? ` ${borrowers} other space(s) use it and changed too.` : ""),
+          },
+        ],
+        structuredContent: {
+          space: { name: space.name, slug: space.slug },
+          designSystem: { id: system.id, name: system.name, tokenCount },
+          alsoUsedBy: borrowers,
         },
       };
     },
@@ -1359,6 +1432,7 @@ export function createCmsyMcpServer(): McpServer {
   registerGetDesignSystem(server);
   registerListDesignSystems(server);
   registerUseDesignSystem(server);
+  registerSetDesignSystemTokens(server);
   registerGetSpace(server);
   registerCreateSpace(server);
   registerRenameSpace(server);

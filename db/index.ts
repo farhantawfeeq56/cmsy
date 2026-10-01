@@ -2,6 +2,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 // Generated from DESIGN.md by `scripts/sync-design.mjs` (see `npm run design:sync`).
 import design from "../app/dashboard/[space]/design.generated.json";
 import type { Prop } from "./component-template";
+import { checkTokens } from "./design-tokens";
 import { checkPageDoc, readPageDoc, type PageDoc } from "./page-doc";
 
 type Client = NeonQueryFunction<false, false>;
@@ -564,6 +565,27 @@ export async function getDesignSystem(id: string): Promise<DesignSystemTokens | 
     where d.id = ${id}
   `);
   return row ?? null;
+}
+
+/**
+ * Replaces a design system's tokens whole. `design-tokens` owns the shape, and
+ * a set with any problem is refused rather than trimmed, as a page body is.
+ * Every space that uses this system sees the change.
+ */
+export async function setDesignSystemTokens(
+  id: string,
+  value: unknown,
+): Promise<{ saved: true } | { saved: false; problems: string[] }> {
+  const { tokens, problems } = checkTokens(value);
+  if (problems.length) return { saved: false, problems };
+
+  const found = await rows<{ id: string }>(db()`
+    update design_systems
+    set tokens = ${JSON.stringify(tokens)}::jsonb
+    where id = ${id}
+    returning id
+  `);
+  return found.length > 0 ? { saved: true } : { saved: false, problems: ["that design system does not exist"] };
 }
 
 export type McpToken = {

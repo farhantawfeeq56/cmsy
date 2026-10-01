@@ -24,6 +24,7 @@ vi.mock("../db", () => ({
   listSpaces: vi.fn(),
   renamePage: vi.fn(),
   renameSpace: vi.fn(),
+  setDesignSystemTokens: vi.fn(),
   setPageDoc: vi.fn(),
   setSpaceDesignSystem: vi.fn(),
   updateComponent: vi.fn(),
@@ -85,7 +86,13 @@ describe("tools/list", () => {
     ]) {
       expect(hints[write]).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
-    for (const destructive of ["delete_component", "set_page_blocks", "delete_page", "delete_space"]) {
+    for (const destructive of [
+      "delete_component",
+      "set_page_blocks",
+      "delete_page",
+      "delete_space",
+      "set_design_system_tokens",
+    ]) {
       expect(hints[destructive]).toMatchObject({ readOnlyHint: false, destructiveHint: true });
     }
   });
@@ -689,5 +696,71 @@ describe("delete_space", () => {
     const result = await call("delete_space", { space: "nope" });
     expect(result.isError).toBe(true);
     expect(db.deleteSpace).not.toHaveBeenCalled();
+  });
+});
+
+describe("set_design_system_tokens", () => {
+  const SITE_OWN = { ...SITE, design_system_id: SITE_SYSTEM.id, design_system_borrowers: 1 };
+  const DOCS_BORROWING = { ...DOCS, design_system_id: SITE_SYSTEM.id };
+  const TOKENS = { colors: { primary: "#222" }, components: { card: { backgroundColor: "{colors.primary}" } } };
+
+  // The write is replaced, but the set is judged by the real checker.
+  beforeEach(async () => {
+    const { checkTokens } = await import("../db/design-tokens");
+    vi.mocked(db.setDesignSystemTokens).mockImplementation(async (_id, value) => {
+      const { problems } = checkTokens(value);
+      return problems.length ? { saved: false, problems } : { saved: true };
+    });
+    vi.mocked(db.getDesignSystem).mockResolvedValue(SITE_SYSTEM);
+    vi.mocked(db.getSpace).mockImplementation(async (slug) =>
+      slug === "marketing-site" ? SITE_OWN : slug === "docs" ? DOCS_BORROWING : null,
+    );
+  });
+
+  it("replaces the tokens of the system the space owns, and says who else changed", async () => {
+    const result = await call("set_design_system_tokens", { space: "marketing-site", tokens: TOKENS });
+    expect(db.setDesignSystemTokens).toHaveBeenCalledWith(SITE_SYSTEM.id, TOKENS);
+    expect(result.content[0].text).toBe(
+      'Saved 2 tokens to "Marketing site design system". 1 other space(s) use it and changed too.',
+    );
+    expect(result.structuredContent).toEqual({
+      space: { name: "Marketing site", slug: "marketing-site" },
+      designSystem: { id: SITE_SYSTEM.id, name: SITE_SYSTEM.name, tokenCount: 2 },
+      alsoUsedBy: 1,
+    });
+  });
+
+  it("refuses a set with problems whole, listing every one", async () => {
+    const result = await call("set_design_system_tokens", {
+      space: "marketing-site",
+      tokens: { shadows: {}, components: { card: { textColor: "{colors.ink}" } } },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/^Nothing was saved:/);
+    expect(result.content[0].text).toContain('"shadows" is not a token group');
+    expect(result.content[0].text).toContain("refers to {colors.ink}");
+  });
+
+  it("will not edit another space's system from a space that only uses it", async () => {
+    const result = await call("set_design_system_tokens", { space: "docs", tokens: TOKENS });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Call this with space "marketing-site"/);
+    expect(db.setDesignSystemTokens).not.toHaveBeenCalled();
+  });
+
+  it("is a tool error for a space with no design system, or no space", async () => {
+    vi.mocked(db.getSpace).mockImplementation(async (slug) => (slug === "docs" ? DOCS : null));
+    expect((await call("set_design_system_tokens", { space: "docs", tokens: TOKENS })).content[0].text).toMatch(
+      /no design system selected/,
+    );
+    expect((await call("set_design_system_tokens", { space: "nope", tokens: TOKENS })).isError).toBe(true);
+    expect(db.setDesignSystemTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe("credentials", () => {
+  it("offers no tool that mints or revokes MCP tokens", async () => {
+    const { tools } = (await rpc("tools/list", {})).result as { tools: { name: string }[] };
+    expect(tools.map((t) => t.name).filter((name) => /mcp|credential|auth/i.test(name))).toEqual([]);
   });
 });

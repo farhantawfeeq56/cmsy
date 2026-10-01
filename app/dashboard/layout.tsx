@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { listMcpTokens, type McpToken } from "@/db";
+import { Suspense } from "react";
+import { findConnectedAgent } from "@/db";
 import { ago } from "./ago";
 import { GlobalSearch } from "./global-search";
 
@@ -9,12 +10,17 @@ export const dynamic = "force-dynamic";
 /**
  * Whether an agent is talking to CMSy, and the way to the page that changes it.
  * Both states link there, because this is the only way in.
+ *
+ * Its own async component inside a Suspense boundary, so the header and the
+ * page below it do not wait on this query.
  */
-function AgentStatus({ agent }: { agent: { name: string; lastUsed: string } | null }) {
-  return agent ? (
+async function AgentStatus() {
+  const live = await findConnectedAgent();
+
+  return live ? (
     <Link
       href="/dashboard/connect"
-      title={`${agent.name} · last used ${agent.lastUsed}`}
+      title={`${live.name} · last used ${ago(live.last_used_at)}`}
       className="badge badge-quiet shrink-0"
     >
       <span aria-hidden className="size-1.5 rounded-full bg-mint" />
@@ -27,17 +33,7 @@ function AgentStatus({ agent }: { agent: { name: string; lastUsed: string } | nu
   );
 }
 
-export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  const tokens = await listMcpTokens();
-
-  // A live token that has been used means an agent is talking to us. Issuing one
-  // is not the same thing, and a revoked one never counts.
-  const live = tokens.find(
-    (token): token is McpToken & { last_used_at: string } =>
-      !token.revoked_at && token.last_used_at !== null,
-  );
-  const agent = live ? { name: live.name, lastUsed: ago(live.last_used_at) } : null;
-
+export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   return (
     <div className="flex min-h-dvh flex-col bg-paper text-ink">
       {/* One header for every dashboard page: the logo is the way home, the
@@ -54,7 +50,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <GlobalSearch />
 
           <div className="ml-auto">
-            <AgentStatus agent={agent} />
+            {/* Nothing until the query answers: either state as a placeholder
+                would claim something about the agent that may be untrue. */}
+            <Suspense fallback={null}>
+              <AgentStatus />
+            </Suspense>
           </div>
         </div>
       </header>

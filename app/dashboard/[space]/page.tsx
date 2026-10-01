@@ -1,5 +1,12 @@
 import { notFound, redirect } from "next/navigation";
-import { getSpace, listComponents, listDesignSystems, listPages } from "@/db";
+import {
+  type ComponentRow,
+  type DesignSystem,
+  getSpace,
+  listComponentsInSpace,
+  listDesignSystems,
+  listPagesInSpace,
+} from "@/db";
 import {
   componentProblems,
   parseProps,
@@ -32,7 +39,15 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
 
   const view: View = query.view === "design" ? "design" : "pages";
 
-  const space = await getSpace(slug);
+  // Every query is keyed by the slug, so they all start now and cost one
+  // round trip between them, rather than each waiting on the space's id.
+  const [space, pages, design] = await Promise.all([
+    getSpace(slug),
+    view === "pages" ? listPagesInSpace(slug) : [],
+    view === "design"
+      ? Promise.all([listComponentsInSpace(slug), listDesignSystems()])
+      : null,
+  ]);
   if (!space) notFound();
 
   // The layout shell is a client component, so the page hands it the data
@@ -40,11 +55,16 @@ export default async function SpacePage(props: PageProps<"/dashboard/[space]">) 
   return (
     <SpaceLayout
       space={space}
-      pages={view === "pages" ? await listPages(space.id) : []}
+      pages={pages}
       view={view}
       design={
-        view === "design" ? (
-          <DesignView spaceId={space.id} designSystemId={space.design_system_id} />
+        design ? (
+          <DesignView
+            spaceId={space.id}
+            designSystemId={space.design_system_id}
+            components={design[0]}
+            systems={design[1]}
+          />
         ) : null
       }
     />
@@ -201,16 +221,17 @@ function TypeStep({ step }: { step: (typeof design.typography)[number] }) {
  * The rules every component is built to. Components and tokens are authored
  * through the MCP server; the choice of system is not, so it is made here.
  */
-async function DesignSystemSection({
+function DesignSystemSection({
   spaceId,
   designSystemId,
+  systems,
   className = "",
 }: {
   spaceId: string;
   designSystemId: string | null;
+  systems: DesignSystem[];
   className?: string;
 }) {
-  const systems = await listDesignSystems();
   const current = systems.find((system) => system.id === designSystemId);
 
   return (
@@ -321,8 +342,6 @@ async function DesignSystemSection({
 
 /* ---------------------------------------------------------------- components */
 
-type ComponentRow = Awaited<ReturnType<typeof listComponents>>[number];
-
 /** A component shows itself: its own template, drawn over a faint dot grid. */
 function ComponentCard({ component }: { component: ComponentRow }) {
   return (
@@ -391,14 +410,17 @@ function ComponentsSection({ components }: { components: ComponentRow[] }) {
  * while `lg` pulls the two headings into one row and the two bodies into the
  * next — so both columns start on the same line without either being nudged.
  */
-async function DesignView({
+function DesignView({
   spaceId,
   designSystemId,
+  components,
+  systems,
 }: {
   spaceId: string;
   designSystemId: string | null;
+  components: ComponentRow[];
+  systems: DesignSystem[];
 }) {
-  const components = await listComponents(spaceId);
 
   return (
     <div className="grid items-start gap-x-10 gap-y-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
@@ -425,6 +447,7 @@ async function DesignView({
       <DesignSystemSection
         spaceId={spaceId}
         designSystemId={designSystemId}
+        systems={systems}
         className="lg:col-start-2 lg:row-start-2"
       />
     </div>

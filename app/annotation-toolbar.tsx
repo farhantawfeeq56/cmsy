@@ -1,7 +1,15 @@
 "use client";
 
-import { Agentation } from "agentation";
+import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
+
+/**
+ * Loaded on demand, not imported: `agentation` is ~400 KB, and a static import
+ * puts it in every client's bundle even where the toolbar renders nothing. As
+ * a dynamic import it is a separate chunk that only a host passing the gate
+ * below ever fetches.
+ */
+const Agentation = dynamic(() => import("agentation").then((m) => m.Agentation), { ssr: false });
 
 /**
  * Local dev and LAN (mDNS) names. `npm run dev` and `npm run dev:vinext` both

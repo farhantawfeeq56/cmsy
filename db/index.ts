@@ -195,6 +195,19 @@ export const listPages = (spaceId: string) =>
     order by created_at
   `);
 
+/**
+ * The same rows as `listPages`, keyed by the space's slug, so a page view can
+ * fetch them alongside `getSpace` rather than waiting for its id.
+ */
+export const listPagesInSpace = (slug: string) =>
+  rows<PageRow>(db()`
+    select p.id, p.title, p.slug, p.created_at
+    from pages p
+    join spaces s on s.id = p.space_id
+    where s.slug = ${slug}
+    order by p.created_at
+  `);
+
 /** One page, by its slug within a space, including the document body. */
 export async function getPage(spaceId: string, slug: string): Promise<PageDetail | null> {
   const found = await rows<PageDetail>(db()`
@@ -251,6 +264,19 @@ export const listComponents = (spaceId: string) =>
     left join components o on o.id = c.origin_component_id
     left join spaces os on os.id = o.space_id
     where c.space_id = ${spaceId}
+    order by c.created_at
+  `);
+
+/** The same rows as `listComponents`, keyed by the space's slug; see `listPagesInSpace`. */
+export const listComponentsInSpace = (slug: string) =>
+  rows<ComponentRow>(db()`
+    select c.id, c.name, c.description, c.props, c.template,
+      o.name as origin_name, os.name as origin_space_name
+    from components c
+    join spaces s on s.id = c.space_id
+    left join components o on o.id = c.origin_component_id
+    left join spaces os on os.id = o.space_id
+    where s.slug = ${slug}
     order by c.created_at
   `);
 
@@ -482,6 +508,22 @@ export const listMcpTokens = () =>
     from mcp_tokens
     order by (revoked_at is not null), created_at desc
   `);
+
+/**
+ * The newest live token an agent has actually used, for the dashboard header.
+ * One row, not the table: issuing a token is not the same as connecting, and a
+ * revoked one never counts.
+ */
+export async function findConnectedAgent(): Promise<{ name: string; last_used_at: string } | null> {
+  const [row] = await rows<{ name: string; last_used_at: string }>(db()`
+    select name, last_used_at
+    from mcp_tokens
+    where revoked_at is null and last_used_at is not null
+    order by created_at desc
+    limit 1
+  `);
+  return row ?? null;
+}
 
 export async function insertMcpToken(token: {
   owner: string;

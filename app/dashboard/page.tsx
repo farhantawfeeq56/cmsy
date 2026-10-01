@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { listRecentActivity, listSpaces, type ActivityItem } from "@/db";
 import { ago } from "./ago";
 import { createSpace } from "./actions";
@@ -13,9 +14,7 @@ const KIND_LABEL: Record<ActivityItem["kind"], string> = {
 
 const initial = (value: string) => value.trim().charAt(0).toUpperCase() || "?";
 
-export default async function DashboardPage() {
-  const [spaces, activity] = await Promise.all([listSpaces(), listRecentActivity()]);
-
+export default function DashboardPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
       <header className="flex flex-wrap items-end justify-between gap-6">
@@ -36,56 +35,74 @@ export default async function DashboardPage() {
           </form>
         </div>      </header>
 
+      {/* The heading and New Space need no data, so they paint at once; each
+          list streams in when its own query answers, neither waiting on the other. */}
       <section className="mt-8">
-        {spaces.length === 0 ? (
-          <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
-            No spaces yet. Create one above to start adding pages and components.
-          </p>
-        ) : (
-          <SpaceRail spaces={spaces} />
-        )}
+        <Suspense fallback={<div aria-busy className="h-60 rounded-xl bg-line motion-safe:animate-pulse" />}>
+          <Spaces />
+        </Suspense>
       </section>
 
       <section className="mt-12 border-t border-line pt-8">
         <h2 className="text-2xl font-semibold tracking-[-0.01em]">Recent Activity</h2>
 
-        {activity.length === 0 ? (
-          <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
-            Nothing yet. Add a page or component inside a space and it shows up here.
-          </p>
-        ) : (
-          <ul className="mt-3 divide-y divide-line">
-            {activity.map((item) => (
-              <li key={`${item.kind}-${item.id}`}>
-                <Link
-                  href={
-                    item.kind === "page"
-                      ? `/dashboard/${item.space_slug}`
-                      : `/dashboard/${item.space_slug}?view=design#components`
-                  }
-                  className="flex items-center gap-4 py-3.5"
-                >
-                  <span
-                    aria-hidden
-                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
-                      TILES[item.kind === "page" ? 0 : 2]
-                    }`}
-                  >
-                    {initial(item.title)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{item.title}</span>
-                    <span className="block truncate text-xs text-smoke">
-                      {item.space_name} · {KIND_LABEL[item.kind]}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs text-smoke">{ago(item.created_at)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <Suspense fallback={<div aria-busy className="mt-5 h-40 rounded-xl bg-line motion-safe:animate-pulse" />}>
+          <Activity />
+        </Suspense>
       </section>
     </main>
+  );
+}
+
+async function Spaces() {
+  const spaces = await listSpaces();
+
+  return spaces.length === 0 ? (
+    <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
+      No spaces yet. Create one above to start adding pages and components.
+    </p>
+  ) : (
+    <SpaceRail spaces={spaces} />
+  );
+}
+
+async function Activity() {
+  const activity = await listRecentActivity();
+
+  return activity.length === 0 ? (
+    <p className="mt-5 rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-smoke">
+      Nothing yet. Add a page or component inside a space and it shows up here.
+    </p>
+  ) : (
+    <ul className="mt-3 divide-y divide-line">
+      {activity.map((item) => (
+        <li key={`${item.kind}-${item.id}`}>
+          <Link
+            href={
+              item.kind === "page"
+                ? `/dashboard/${item.space_slug}`
+                : `/dashboard/${item.space_slug}?view=design#components`
+            }
+            className="flex items-center gap-4 py-3.5"
+          >
+            <span
+              aria-hidden
+              className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+                TILES[item.kind === "page" ? 0 : 2]
+              }`}
+            >
+              {initial(item.title)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{item.title}</span>
+              <span className="block truncate text-xs text-smoke">
+                {item.space_name} · {KIND_LABEL[item.kind]}
+              </span>
+            </span>
+            <span className="shrink-0 text-xs text-smoke">{ago(item.created_at)}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

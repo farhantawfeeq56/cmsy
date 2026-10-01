@@ -266,3 +266,28 @@ describe("component writes", () => {
     expect(calls[0].sql).toMatch(/select id, name, props, template from components/);
   });
 });
+
+describe("findConnectedAgent", () => {
+  it("asks for one live, used token rather than reading the table", async () => {
+    const { findConnectedAgent } = await load();
+    nextRows = [{ name: "Claude", last_used_at: "2026-10-01T00:00:00Z" }];
+    expect(await findConnectedAgent()).toEqual({ name: "Claude", last_used_at: "2026-10-01T00:00:00Z" });
+    expect(calls[0].sql).toMatch(/revoked_at is null and last_used_at is not null/);
+    expect(calls[0].sql).toMatch(/limit 1/);
+  });
+
+  it("is null when no agent has connected", async () => {
+    const { findConnectedAgent } = await load();
+    expect(await findConnectedAgent()).toBeNull();
+  });
+});
+
+describe("slug-keyed listings", () => {
+  it("bind the slug, so a page view need not wait for the space's id", async () => {
+    const { listPagesInSpace, listComponentsInSpace } = await load();
+    await listPagesInSpace("docs");
+    await listComponentsInSpace("docs");
+    expect(calls.map((c) => c.values)).toEqual([["docs"], ["docs"]]);
+    for (const call of calls) expect(call.sql).toMatch(/where s\.slug = \$\?/);
+  });
+});

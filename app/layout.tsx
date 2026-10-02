@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { AnnotationToolbar } from "./annotation-toolbar";
+import { Attraction } from "./attraction";
 import "./globals.css";
 
 const nohemi = localFont({
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {children}
+        <Attraction />
         <AnnotationToolbar />
       </body>
     </html>

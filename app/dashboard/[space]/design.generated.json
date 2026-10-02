@@ -238,6 +238,41 @@
         "- Do use pastels with ink text for content-state badges; don't use them",
         "  for buttons.",
         "- Do hover primary buttons to 90% opacity; don't add gradients to buttons.",
+        "",
+        ""
+      ]
+    },
+    {
+      "title": "Magnetic interaction",
+      "lines": [
+        "",
+        "Things in CMSy are drawn towards the positions that mean something, so a",
+        "writer gets the layout they were reaching for without asking for it. It is",
+        "never decoration: a magnet that fights the hand is worse than no magnet at all.",
+        "",
+        "**In the page editor**, a dragged block snaps to the edges, centres and",
+        "spacing of what is already on the canvas — the reading column, and every other",
+        "block on the page. The snap lands on the frame the cursor arrives, and a 1px",
+        "phoenix orange guide draws along the line it met, so what is drawn and what",
+        "happened cannot disagree. The threshold is 6px, under one step of the spacing",
+        "scale: a snap is felt, not seen.",
+        "",
+        "Only the leading edge and the centre are candidates, never the trailing edge,",
+        "and each axis is decided on its own — a block held on the column's centre stays",
+        "free to move vertically. The magnet takes the drop, never the drag.",
+        "",
+        "**Everywhere else**, a card or row marked `data-magnetic` lifts 3px and takes a",
+        "mint edge as the pointer nears it, easing back as it leaves. The space tiles on",
+        "the dashboard are excluded: they are fanned with their own transform, and a",
+        "lift would win.",
+        "",
+        "The spacing scale above (8 / 16 / 24 / 40 / 64) is the one both read from, so a",
+        "guide the editor snaps to and a lift outside it come from the same numbers.",
+        "`prefers-reduced-motion` keeps the highlight and drops the movement.",
+        "",
+        "Do add magnetism where the user is placing something. Don't add it to anything",
+        "that already owns its transform, and don't let a snap move further than the",
+        "threshold.",
         ""
       ]
     }

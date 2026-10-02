@@ -228,6 +228,43 @@ body {
   font-size: 0.75rem;
 }
 
+/* Magnetic interaction. `app/magnetic.ts` is the editor's snapping,
+   `app/attraction.tsx` the rest of the app, and the spacing scale here is the
+   one `GUTTERS` there repeats. */
+:root {
+  --magnetic-gutter-sm: 8px;
+  --magnetic-gutter-md: 16px;
+  --magnetic-gutter-lg: 24px;
+  --magnetic-gutter-xl: 40px;
+  --magnetic-gutter-2xl: 64px;
+}
+
+/* Anything marked `data-magnetic` is drawn towards the pointer as it nears.
+   `--near` is 0 at the element's edge and 1 at `REACH` away (see
+   `app/attraction.tsx`), so `calc()` turns it into the lift on its own. Not for
+   anything that already owns its transform — the fanned space tiles do, and a
+   lift would win over the fan. */
+[data-magnetic] {
+  --lift: calc((1 - var(--near, 1)) * 3px);
+  transform: translateY(calc(var(--lift) * -1));
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* The edge is a second, quieter channel, and only for something with a border
+   to change — a card, not a bare row. The rows keep their hairline dividers and
+   answer the pointer by lifting alone. */
+.card[data-magnetic]:hover,
+.card[data-magnetic]:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 1px 1px #1111110d, 0 6px 12px #1111111a;
+}
+
+/* Movement is the decoration; the highlight is not, so reduced motion keeps
+   one and drops the other. */
+@media (prefers-reduced-motion: reduce) {
+  [data-magnetic] { transform: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+}
+
 @media (max-width: 640px) {
   .doc-title { font-size: 2rem; letter-spacing: -1px; }
   .doc-page { padding: 1.5rem 1rem 8rem; }

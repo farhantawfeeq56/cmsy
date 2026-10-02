@@ -195,6 +195,7 @@ function Rows({
       {pages.map((page) => (
         <li
           key={page.id}
+          data-magnetic=""
           className="flex items-center gap-3 py-3.5"
         >
           <FileIcon className="size-4 shrink-0 text-smoke" />

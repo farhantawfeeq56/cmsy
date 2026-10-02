@@ -129,7 +129,7 @@ export function ComponentCard({ component }: { component: ComponentRow }) {
 
   return (
     <>
-      <li className="overflow-hidden rounded-xl border border-line bg-card transition-shadow hover:shadow-[0_8px_24px_#1111110d]">
+      <li data-magnetic="" className="card overflow-hidden rounded-xl border border-line bg-card">
         <button
           ref={cardRef}
           type="button"
